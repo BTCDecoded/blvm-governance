@@ -3,10 +3,13 @@
 //! Provides NodeAPI trait implementation over IPC for the Governance module.
 
 use async_trait::async_trait;
-use bllvm_node::module::ipc::client::ModuleIpcClient;
-use bllvm_node::module::ipc::protocol::{EventPayload, EventType, RequestMessage, RequestPayload, ResponsePayload};
-use bllvm_node::module::traits::{ModuleError, NodeAPI};
-use bllvm_protocol::{Block, BlockHeader, Hash, OutPoint, Transaction, UTXO};
+use blvm_node::module::ipc::client::ModuleIpcClient;
+use blvm_node::module::ipc::protocol::{
+    EventPayload, MessageType, RequestMessage, RequestPayload, ResponsePayload,
+};
+use blvm_node::module::traits::{ModuleError, NodeAPI};
+use blvm_node::module::EventType;
+use blvm_protocol::{Block, BlockHeader, Hash, OutPoint, Transaction, UTXO};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -31,6 +34,33 @@ impl NodeApiIpc {
         *id += 1;
         *id
     }
+
+    /// Helper method to make IPC requests
+    async fn request<T, F>(
+        &self,
+        payload: RequestPayload,
+        request_type: MessageType,
+        mapper: F,
+    ) -> Result<T, ModuleError>
+    where
+        F: FnOnce(ResponsePayload) -> Result<T, ModuleError>,
+    {
+        let correlation_id = self.next_correlation_id().await;
+        let request = RequestMessage {
+            correlation_id,
+            request_type,
+            payload,
+        };
+
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
+        match response.payload {
+            Some(payload) => mapper(payload),
+            None => Err(ModuleError::OperationError("Empty response".to_string())),
+        }
+    }
 }
 
 #[async_trait]
@@ -39,11 +69,14 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
             payload: RequestPayload::GetBlock { hash: *hash },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::Block(block)) => Ok(block),
             _ => Ok(None),
@@ -54,11 +87,14 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlockHeader,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlockHeader,
             payload: RequestPayload::GetBlockHeader { hash: *hash },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::BlockHeader(header)) => Ok(header),
             _ => Ok(None),
@@ -69,11 +105,14 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetTransaction,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetTransaction,
             payload: RequestPayload::GetTransaction { hash: *hash },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::Transaction(tx)) => Ok(tx),
             _ => Ok(None),
@@ -84,11 +123,14 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::HasTransaction,
+            request_type: blvm_node::module::ipc::protocol::MessageType::HasTransaction,
             payload: RequestPayload::HasTransaction { hash: *hash },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::Bool(value)) => Ok(value),
             _ => Ok(false),
@@ -99,14 +141,19 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetChainTip,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetChainTip,
             payload: RequestPayload::GetChainTip,
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::Hash(hash)) => Ok(hash),
-            _ => Err(ModuleError::OperationError("Failed to get chain tip".to_string())),
+            _ => Err(ModuleError::OperationError(
+                "Failed to get chain tip".to_string(),
+            )),
         }
     }
 
@@ -114,14 +161,19 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlockHeight,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlockHeight,
             payload: RequestPayload::GetBlockHeight,
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::U64(height)) => Ok(height),
-            _ => Err(ModuleError::OperationError("Failed to get block height".to_string())),
+            _ => Err(ModuleError::OperationError(
+                "Failed to get block height".to_string(),
+            )),
         }
     }
 
@@ -129,13 +181,16 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetUtxo,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetUtxo,
             payload: RequestPayload::GetUtxo {
                 outpoint: outpoint.clone(),
             },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::Utxo(utxo)) => Ok(utxo),
             _ => Ok(None),
@@ -144,99 +199,137 @@ impl NodeAPI for NodeApiIpc {
 
     async fn subscribe_events(
         &self,
-        _event_types: Vec<bllvm_node::module::traits::EventType>,
-    ) -> Result<(), ModuleError> {
+        _event_types: Vec<blvm_node::module::traits::EventType>,
+    ) -> Result<
+        tokio::sync::mpsc::Receiver<blvm_node::module::ipc::protocol::ModuleMessage>,
+        ModuleError,
+    > {
         // Event subscription is handled by ModuleClient
-        Ok(())
+        // Create a dummy receiver that will never receive anything
+        let (_tx, rx) = tokio::sync::mpsc::channel(1);
+        Ok(rx)
     }
 
     async fn get_mempool_transactions(&self) -> Result<Vec<Hash>, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetMempoolTransactions,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetMempoolTransactions,
             payload: RequestPayload::GetMempoolTransactions,
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::MempoolTransactions(hashes)) => Ok(hashes),
             _ => Ok(Vec::new()),
         }
     }
 
-    async fn get_mempool_transaction(&self, tx_hash: &Hash) -> Result<Option<Transaction>, ModuleError> {
+    async fn get_mempool_transaction(
+        &self,
+        tx_hash: &Hash,
+    ) -> Result<Option<Transaction>, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetMempoolTransaction,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetMempoolTransaction,
             payload: RequestPayload::GetMempoolTransaction { tx_hash: *tx_hash },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::MempoolTransaction(tx)) => Ok(tx),
             _ => Ok(None),
         }
     }
 
-    async fn get_mempool_size(&self) -> Result<bllvm_node::module::traits::MempoolSize, ModuleError> {
+    async fn get_mempool_size(
+        &self,
+    ) -> Result<blvm_node::module::traits::MempoolSize, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetMempoolSize,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetMempoolSize,
             payload: RequestPayload::GetMempoolSize,
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::MempoolSize(size)) => Ok(size),
-            _ => Err(ModuleError::OperationError("Failed to get mempool size".to_string())),
+            _ => Err(ModuleError::OperationError(
+                "Failed to get mempool size".to_string(),
+            )),
         }
     }
 
-    async fn get_network_stats(&self) -> Result<bllvm_node::module::traits::NetworkStats, ModuleError> {
+    async fn get_network_stats(
+        &self,
+    ) -> Result<blvm_node::module::traits::NetworkStats, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetNetworkStats,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetNetworkStats,
             payload: RequestPayload::GetNetworkStats,
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::NetworkStats(stats)) => Ok(stats),
-            _ => Err(ModuleError::OperationError("Failed to get network stats".to_string())),
+            _ => Err(ModuleError::OperationError(
+                "Failed to get network stats".to_string(),
+            )),
         }
     }
 
-    async fn get_network_peers(&self) -> Result<Vec<bllvm_node::module::traits::PeerInfo>, ModuleError> {
+    async fn get_network_peers(
+        &self,
+    ) -> Result<Vec<blvm_node::module::traits::PeerInfo>, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetNetworkPeers,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetNetworkPeers,
             payload: RequestPayload::GetNetworkPeers,
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::NetworkPeers(peers)) => Ok(peers),
             _ => Ok(Vec::new()),
         }
     }
 
-    async fn get_chain_info(&self) -> Result<bllvm_node::module::traits::ChainInfo, ModuleError> {
+    async fn get_chain_info(&self) -> Result<blvm_node::module::traits::ChainInfo, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetChainInfo,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetChainInfo,
             payload: RequestPayload::GetChainInfo,
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::ChainInfo(info)) => Ok(info),
-            _ => Err(ModuleError::OperationError("Failed to get chain info".to_string())),
+            _ => Err(ModuleError::OperationError(
+                "Failed to get chain info".to_string(),
+            )),
         }
     }
 
@@ -244,11 +337,14 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlockByHeight,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlockByHeight,
             payload: RequestPayload::GetBlockByHeight { height },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::BlockByHeight(block)) => Ok(block),
             _ => Ok(None),
@@ -259,43 +355,57 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetLightningNodeUrl,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetLightningNodeUrl,
             payload: RequestPayload::GetLightningNodeUrl,
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::LightningNodeUrl(url)) => Ok(url),
             _ => Ok(None),
         }
     }
 
-    async fn get_lightning_info(&self) -> Result<Option<bllvm_node::module::traits::LightningInfo>, ModuleError> {
+    async fn get_lightning_info(
+        &self,
+    ) -> Result<Option<blvm_node::module::traits::LightningInfo>, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetLightningInfo,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetLightningInfo,
             payload: RequestPayload::GetLightningInfo,
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::LightningInfo(info)) => Ok(info),
             _ => Ok(None),
         }
     }
 
-    async fn get_payment_state(&self, payment_id: &str) -> Result<Option<bllvm_node::module::traits::PaymentState>, ModuleError> {
+    async fn get_payment_state(
+        &self,
+        payment_id: &str,
+    ) -> Result<Option<blvm_node::module::traits::PaymentState>, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetPaymentState,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetPaymentState,
             payload: RequestPayload::GetPaymentState {
                 payment_id: payment_id.to_string(),
             },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::PaymentState(state)) => Ok(state),
             _ => Ok(None),
@@ -306,11 +416,14 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::CheckTransactionInMempool,
+            request_type: blvm_node::module::ipc::protocol::MessageType::CheckTransactionInMempool,
             payload: RequestPayload::CheckTransactionInMempool { tx_hash: *tx_hash },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::CheckTransactionInMempool(exists)) => Ok(exists),
             _ => Ok(false),
@@ -321,14 +434,19 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetFeeEstimate,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetFeeEstimate,
             payload: RequestPayload::GetFeeEstimate { target_blocks },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::FeeEstimate(estimate)) => Ok(estimate),
-            _ => Err(ModuleError::OperationError("Failed to get fee estimate".to_string())),
+            _ => Err(ModuleError::OperationError(
+                "Failed to get fee estimate".to_string(),
+            )),
         }
     }
 
@@ -337,14 +455,19 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock, // MessageType is not used for routing
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock, // MessageType is not used for routing
             payload: RequestPayload::ReadFile { path },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::FileData(data)) => Ok(data),
-            _ => Err(ModuleError::OperationError("Failed to read file".to_string())),
+            _ => Err(ModuleError::OperationError(
+                "Failed to read file".to_string(),
+            )),
         }
     }
 
@@ -352,15 +475,22 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
             payload: RequestPayload::WriteFile { path, data },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         if response.success {
             Ok(())
         } else {
-            Err(ModuleError::OperationError(response.error.unwrap_or_else(|| "Failed to write file".to_string())))
+            Err(ModuleError::OperationError(
+                response
+                    .error
+                    .unwrap_or_else(|| "Failed to write file".to_string()),
+            ))
         }
     }
 
@@ -368,15 +498,22 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
             payload: RequestPayload::DeleteFile { path },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         if response.success {
             Ok(())
         } else {
-            Err(ModuleError::OperationError(response.error.unwrap_or_else(|| "Failed to delete file".to_string())))
+            Err(ModuleError::OperationError(
+                response
+                    .error
+                    .unwrap_or_else(|| "Failed to delete file".to_string()),
+            ))
         }
     }
 
@@ -384,11 +521,14 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
             payload: RequestPayload::ListDirectory { path },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::DirectoryListing(entries)) => Ok(entries),
             _ => Ok(Vec::new()),
@@ -399,33 +539,43 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
             payload: RequestPayload::CreateDirectory { path },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         if response.success {
             Ok(())
         } else {
-            Err(ModuleError::OperationError(response.error.unwrap_or_else(|| "Failed to create directory".to_string())))
+            Err(ModuleError::OperationError(response.error.unwrap_or_else(
+                || "Failed to create directory".to_string(),
+            )))
         }
     }
 
     async fn get_file_metadata(
         &self,
         path: String,
-    ) -> Result<bllvm_node::module::ipc::protocol::FileMetadata, ModuleError> {
+    ) -> Result<blvm_node::module::ipc::protocol::FileMetadata, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
             payload: RequestPayload::GetFileMetadata { path },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::FileMetadata(metadata)) => Ok(metadata),
-            _ => Err(ModuleError::OperationError("Failed to get file metadata".to_string())),
+            _ => Err(ModuleError::OperationError(
+                "Failed to get file metadata".to_string(),
+            )),
         }
     }
 
@@ -434,42 +584,68 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
             payload: RequestPayload::StorageOpenTree { name },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::StorageTreeId(tree_id)) => Ok(tree_id),
-            _ => Err(ModuleError::OperationError("Failed to open storage tree".to_string())),
+            _ => Err(ModuleError::OperationError(
+                "Failed to open storage tree".to_string(),
+            )),
         }
     }
 
-    async fn storage_insert(&self, tree_id: String, key: Vec<u8>, value: Vec<u8>) -> Result<(), ModuleError> {
+    async fn storage_insert(
+        &self,
+        tree_id: String,
+        key: Vec<u8>,
+        value: Vec<u8>,
+    ) -> Result<(), ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
-            payload: RequestPayload::StorageInsert { tree_id, key, value },
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
+            payload: RequestPayload::StorageInsert {
+                tree_id,
+                key,
+                value,
+            },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         if response.success {
             Ok(())
         } else {
-            Err(ModuleError::OperationError(response.error.unwrap_or_else(|| "Failed to insert into storage".to_string())))
+            Err(ModuleError::OperationError(response.error.unwrap_or_else(
+                || "Failed to insert into storage".to_string(),
+            )))
         }
     }
 
-    async fn storage_get(&self, tree_id: String, key: Vec<u8>) -> Result<Option<Vec<u8>>, ModuleError> {
+    async fn storage_get(
+        &self,
+        tree_id: String,
+        key: Vec<u8>,
+    ) -> Result<Option<Vec<u8>>, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
             payload: RequestPayload::StorageGet { tree_id, key },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::StorageValue(value)) => Ok(value),
             _ => Ok(None),
@@ -480,27 +656,39 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
             payload: RequestPayload::StorageRemove { tree_id, key },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         if response.success {
             Ok(())
         } else {
-            Err(ModuleError::OperationError(response.error.unwrap_or_else(|| "Failed to remove from storage".to_string())))
+            Err(ModuleError::OperationError(response.error.unwrap_or_else(
+                || "Failed to remove from storage".to_string(),
+            )))
         }
     }
 
-    async fn storage_contains_key(&self, tree_id: String, key: Vec<u8>) -> Result<bool, ModuleError> {
+    async fn storage_contains_key(
+        &self,
+        tree_id: String,
+        key: Vec<u8>,
+    ) -> Result<bool, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
             payload: RequestPayload::StorageContainsKey { tree_id, key },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::Bool(exists)) => Ok(exists),
             _ => Ok(false),
@@ -511,11 +699,14 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
             payload: RequestPayload::StorageIter { tree_id },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::StorageKeyValuePairs(pairs)) => Ok(pairs),
             _ => Ok(Vec::new()),
@@ -525,20 +716,28 @@ impl NodeAPI for NodeApiIpc {
     async fn storage_transaction(
         &self,
         tree_id: String,
-        operations: Vec<bllvm_node::module::ipc::protocol::StorageOperation>,
+        operations: Vec<blvm_node::module::ipc::protocol::StorageOperation>,
     ) -> Result<(), ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetBlock,
-            payload: RequestPayload::StorageTransaction { tree_id, operations },
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetBlock,
+            payload: RequestPayload::StorageTransaction {
+                tree_id,
+                operations,
+            },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         if response.success {
             Ok(())
         } else {
-            Err(ModuleError::OperationError(response.error.unwrap_or_else(|| "Failed to execute storage transaction".to_string())))
+            Err(ModuleError::OperationError(response.error.unwrap_or_else(
+                || "Failed to execute storage transaction".to_string(),
+            )))
         }
     }
 
@@ -551,15 +750,23 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::RegisterRpcEndpoint,
-            payload: RequestPayload::RegisterRpcEndpoint { method, description },
+            request_type: blvm_node::module::ipc::protocol::MessageType::RegisterRpcEndpoint,
+            payload: RequestPayload::RegisterRpcEndpoint {
+                method,
+                description,
+            },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         if response.success {
             Ok(())
         } else {
-            Err(ModuleError::OperationError(response.error.unwrap_or_else(|| "Failed to register RPC endpoint".to_string())))
+            Err(ModuleError::OperationError(response.error.unwrap_or_else(
+                || "Failed to register RPC endpoint".to_string(),
+            )))
         }
     }
 
@@ -567,15 +774,22 @@ impl NodeAPI for NodeApiIpc {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::UnregisterRpcEndpoint,
-            payload: RequestPayload::UnregisterRpcEndpoint { method: method.to_string() },
+            request_type: blvm_node::module::ipc::protocol::MessageType::UnregisterRpcEndpoint,
+            payload: RequestPayload::UnregisterRpcEndpoint {
+                method: method.to_string(),
+            },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         if response.success {
             Ok(())
         } else {
-            Err(ModuleError::OperationError(response.error.unwrap_or_else(|| "Failed to unregister RPC endpoint".to_string())))
+            Err(ModuleError::OperationError(response.error.unwrap_or_else(
+                || "Failed to unregister RPC endpoint".to_string(),
+            )))
         }
     }
 
@@ -584,8 +798,8 @@ impl NodeAPI for NodeApiIpc {
     async fn register_timer(
         &self,
         _interval_seconds: u64,
-        _callback: Arc<dyn bllvm_node::module::timers::manager::TimerCallback>,
-    ) -> Result<bllvm_node::module::timers::manager::TimerId, ModuleError> {
+        _callback: Arc<dyn blvm_node::module::timers::manager::TimerCallback>,
+    ) -> Result<blvm_node::module::timers::manager::TimerId, ModuleError> {
         Err(ModuleError::OperationError(
             "Timer registration requires callback which cannot be serialized over IPC. Use module-side timer management (e.g., tokio::time::interval).".to_string()
         ))
@@ -593,52 +807,68 @@ impl NodeAPI for NodeApiIpc {
 
     async fn cancel_timer(
         &self,
-        _timer_id: bllvm_node::module::timers::manager::TimerId,
+        _timer_id: blvm_node::module::timers::manager::TimerId,
     ) -> Result<(), ModuleError> {
         Err(ModuleError::OperationError(
-            "Timer cancellation not supported over IPC. Use module-side timer management.".to_string()
+            "Timer cancellation not supported over IPC. Use module-side timer management."
+                .to_string(),
         ))
     }
 
     async fn schedule_task(
         &self,
         _delay_seconds: u64,
-        _callback: Arc<dyn bllvm_node::module::timers::manager::TaskCallback>,
-    ) -> Result<bllvm_node::module::timers::manager::TaskId, ModuleError> {
+        _callback: Arc<dyn blvm_node::module::timers::manager::TaskCallback>,
+    ) -> Result<blvm_node::module::timers::manager::TaskId, ModuleError> {
         Err(ModuleError::OperationError(
             "Task scheduling requires callback which cannot be serialized over IPC. Use module-side task management (e.g., tokio::time::sleep).".to_string()
         ))
     }
 
     // Metrics and telemetry (implemented via IPC)
-    async fn report_metric(&self, metric: bllvm_node::module::metrics::manager::Metric) -> Result<(), ModuleError> {
+    async fn report_metric(
+        &self,
+        metric: blvm_node::module::metrics::manager::Metric,
+    ) -> Result<(), ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::ReportMetric,
+            request_type: blvm_node::module::ipc::protocol::MessageType::ReportMetric,
             payload: RequestPayload::ReportMetric { metric },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         if response.success {
             Ok(())
         } else {
-            Err(ModuleError::OperationError(response.error.unwrap_or_else(|| "Failed to report metric".to_string())))
+            Err(ModuleError::OperationError(
+                response
+                    .error
+                    .unwrap_or_else(|| "Failed to report metric".to_string()),
+            ))
         }
     }
 
     async fn get_module_metrics(
         &self,
         module_id: &str,
-    ) -> Result<Vec<bllvm_node::module::metrics::manager::Metric>, ModuleError> {
+    ) -> Result<Vec<blvm_node::module::metrics::manager::Metric>, ModuleError> {
         let correlation_id = self.next_correlation_id().await;
         let request = RequestMessage {
             correlation_id,
-            request_type: bllvm_node::module::ipc::protocol::MessageType::GetModuleMetrics,
-            payload: RequestPayload::GetModuleMetrics { module_id: module_id.to_string() },
+            request_type: blvm_node::module::ipc::protocol::MessageType::GetModuleMetrics,
+            payload: RequestPayload::GetModuleMetrics {
+                module_id: module_id.to_string(),
+            },
         };
 
-        let response = self.ipc_client.lock().await.request(request).await?;
+        let response = {
+            let mut client = self.ipc_client.lock().await;
+            client.request(request).await?
+        };
         match response.payload {
             Some(ResponsePayload::ModuleMetrics(metrics)) => Ok(metrics),
             _ => Ok(Vec::new()),
@@ -648,63 +878,263 @@ impl NodeAPI for NodeApiIpc {
     // Module initialization (handled by IPC server during handshake)
     async fn initialize_module(
         &self,
-        _module_id: &str,
-        _base_data_dir: &std::path::Path,
+        _module_id: String,
+        _module_data_dir: std::path::PathBuf,
+        _base_data_dir: std::path::PathBuf,
     ) -> Result<(), ModuleError> {
         // This is called by the IPC server during handshake, not by modules directly
         Ok(())
     }
-    
-    async fn discover_modules(&self) -> Result<Vec<bllvm_node::module::traits::ModuleInfo>, ModuleError> {
+
+    async fn discover_modules(
+        &self,
+    ) -> Result<Vec<blvm_node::module::traits::ModuleInfo>, ModuleError> {
         self.request(
             RequestPayload::DiscoverModules,
+            MessageType::DiscoverModules,
             |payload| match payload {
                 ResponsePayload::ModuleList(modules) => Ok(modules),
-                _ => Err(ModuleError::OperationError("Unexpected response type".to_string())),
+                _ => Err(ModuleError::OperationError(
+                    "Unexpected response type".to_string(),
+                )),
             },
         )
         .await
     }
-    
-    async fn get_module_info(&self, module_id: &str) -> Result<Option<bllvm_node::module::traits::ModuleInfo>, ModuleError> {
+
+    async fn get_module_info(
+        &self,
+        module_id: &str,
+    ) -> Result<Option<blvm_node::module::traits::ModuleInfo>, ModuleError> {
         self.request(
             RequestPayload::GetModuleInfo {
                 module_id: module_id.to_string(),
             },
+            MessageType::GetModuleInfo,
             |payload| match payload {
                 ResponsePayload::ModuleInfo(info) => Ok(info),
-                _ => Err(ModuleError::OperationError("Unexpected response type".to_string())),
+                _ => Err(ModuleError::OperationError(
+                    "Unexpected response type".to_string(),
+                )),
             },
         )
         .await
     }
-    
+
     async fn is_module_available(&self, module_id: &str) -> Result<bool, ModuleError> {
         self.request(
             RequestPayload::IsModuleAvailable {
                 module_id: module_id.to_string(),
             },
+            MessageType::IsModuleAvailable,
             |payload| match payload {
                 ResponsePayload::ModuleAvailable(available) => Ok(available),
+                _ => Err(ModuleError::OperationError(
+                    "Unexpected response type".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    async fn publish_event(
+        &self,
+        event_type: blvm_node::module::traits::EventType,
+        payload: blvm_node::module::ipc::protocol::EventPayload,
+    ) -> Result<(), ModuleError> {
+        self.request(
+            RequestPayload::PublishEvent {
+                event_type,
+                payload,
+            },
+            MessageType::PublishEvent,
+            |payload| match payload {
+                ResponsePayload::EventPublished => Ok(()),
+                _ => Err(ModuleError::OperationError(
+                    "Unexpected response type".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    // === Missing trait methods - stub implementations ===
+    async fn get_all_metrics(
+        &self,
+    ) -> Result<
+        std::collections::HashMap<String, Vec<blvm_node::module::metrics::manager::Metric>>,
+        ModuleError,
+    > {
+        self.request(
+            RequestPayload::GetAllMetrics,
+            MessageType::GetAllMetrics,
+            |payload| match payload {
+                ResponsePayload::AllMetrics(metrics) => Ok(metrics),
                 _ => Err(ModuleError::OperationError("Unexpected response type".to_string())),
             },
         )
         .await
     }
-    
-    async fn publish_event(
+
+    async fn call_module(
         &self,
-        event_type: bllvm_node::module::traits::EventType,
-        payload: bllvm_node::module::ipc::protocol::EventPayload,
+        target_module_id: Option<&str>,
+        method: &str,
+        params: Vec<u8>,
+    ) -> Result<Vec<u8>, ModuleError> {
+        self.request(
+            RequestPayload::CallModule {
+                target_module_id: target_module_id.map(|s| s.to_string()),
+                method: method.to_string(),
+                params,
+            },
+            MessageType::CallModule,
+            |payload| match payload {
+                ResponsePayload::ModuleApiResponse(response) => Ok(response),
+                _ => Err(ModuleError::OperationError("Unexpected response type".to_string())),
+            },
+        )
+        .await
+    }
+
+    async fn register_module_api(
+        &self,
+        _api: Arc<dyn blvm_node::module::inter_module::api::ModuleAPI>,
+    ) -> Result<(), ModuleError> {
+        // Module API registration cannot be done over IPC as the API implementation
+        // (Arc<dyn ModuleAPI>) cannot be serialized. This must be handled via
+        // module-side registration mechanism, not through the NodeAPI IPC interface.
+        Err(ModuleError::OperationError(
+            "Module API registration must be done via module-side registration, not IPC".to_string(),
+        ))
+    }
+
+    async fn unregister_module_api(&self) -> Result<(), ModuleError> {
+        self.request(
+            RequestPayload::UnregisterModuleApi,
+            MessageType::UnregisterModuleApi,
+            |payload| match payload {
+                ResponsePayload::ModuleApiUnregistered => Ok(()),
+                _ => Err(ModuleError::OperationError("Unexpected response type".to_string())),
+            },
+        )
+        .await
+    }
+
+    async fn send_mesh_packet_to_module(
+        &self,
+        _module_id: &str,
+        _packet_data: Vec<u8>,
+        _peer_addr: String,
+    ) -> Result<(), ModuleError> {
+        // This method is for the node to send packets to modules, not for modules to call over IPC.
+        // Modules should use send_mesh_packet_to_peer() instead.
+        Err(ModuleError::OperationError(
+            "send_mesh_packet_to_module is not available over IPC - use send_mesh_packet_to_peer instead".to_string(),
+        ))
+    }
+
+    async fn send_mesh_packet_to_peer(
+        &self,
+        peer_addr: String,
+        packet_data: Vec<u8>,
     ) -> Result<(), ModuleError> {
         self.request(
-            RequestPayload::PublishEvent { event_type, payload },
+            RequestPayload::SendMeshPacketToPeer {
+                peer_addr,
+                packet_data,
+            },
+            MessageType::SendMeshPacketToPeer,
             |payload| match payload {
-                ResponsePayload::EventPublished => Ok(()),
+                ResponsePayload::Bool(success) => {
+                    if success {
+                        Ok(())
+                    } else {
+                        Err(ModuleError::OperationError(
+                            "Failed to send mesh packet".to_string(),
+                        ))
+                    }
+                }
+                _ => Err(ModuleError::OperationError(
+                    "Invalid response format".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    async fn send_stratum_v2_message_to_peer(
+        &self,
+        peer_addr: String,
+        message_data: Vec<u8>,
+    ) -> Result<(), ModuleError> {
+        self.request(
+            RequestPayload::SendStratumV2MessageToPeer {
+                peer_addr,
+                message_data,
+            },
+            MessageType::SendStratumV2MessageToPeer,
+            |payload| match payload {
+                ResponsePayload::Bool(success) => {
+                    if success {
+                        Ok(())
+                    } else {
+                        Err(ModuleError::OperationError(
+                            "Failed to send Stratum V2 message".to_string(),
+                        ))
+                    }
+                }
+                _ => Err(ModuleError::OperationError(
+                    "Invalid response format".to_string(),
+                )),
+            },
+        )
+        .await
+    }
+
+    async fn get_module_health(
+        &self,
+        module_id: &str,
+    ) -> Result<Option<blvm_node::module::process::monitor::ModuleHealth>, ModuleError> {
+        self.request(
+            RequestPayload::GetModuleHealth {
+                module_id: module_id.to_string(),
+            },
+            MessageType::GetModuleHealth,
+            |payload| match payload {
+                ResponsePayload::ModuleHealth(health) => Ok(health),
+                _ => Err(ModuleError::OperationError("Unexpected response type".to_string())),
+            },
+        )
+        .await
+    }
+
+    async fn get_all_module_health(
+        &self,
+    ) -> Result<Vec<(String, blvm_node::module::process::monitor::ModuleHealth)>, ModuleError> {
+        self.request(
+            RequestPayload::GetAllModuleHealth,
+            MessageType::GetAllModuleHealth,
+            |payload| match payload {
+                ResponsePayload::AllModuleHealth(health) => Ok(health),
+                _ => Err(ModuleError::OperationError("Unexpected response type".to_string())),
+            },
+        )
+        .await
+    }
+
+    async fn report_module_health(
+        &self,
+        health: blvm_node::module::process::monitor::ModuleHealth,
+    ) -> Result<(), ModuleError> {
+        self.request(
+            RequestPayload::ReportModuleHealth { health },
+            MessageType::ReportModuleHealth,
+            |payload| match payload {
+                ResponsePayload::HealthReported => Ok(()),
                 _ => Err(ModuleError::OperationError("Unexpected response type".to_string())),
             },
         )
         .await
     }
 }
-

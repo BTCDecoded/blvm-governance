@@ -198,26 +198,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
 
 [[package]]
-name = "bllvm-consensus"
-version = "0.1.6"
+name = "block-buffer"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
- "anyhow",
- "bincode",
- "bitcoin_hashes",
- "hex",
- "ripemd",
- "secp256k1",
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
+ "generic-array",
 ]
 
 [[package]]
-name = "bllvm-consensus"
+name = "blvm-consensus"
 version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f1ba379960acabb26493fcfe42d4be53b1869540fe283734f05d77a4998a68c"
 dependencies = [
  "anyhow",
  "bincode",
@@ -235,12 +226,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "bllvm-governance"
+name = "blvm-governance"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bllvm-node",
+ "blvm-node",
+ "blvm-protocol",
  "clap",
  "futures",
  "hex",
@@ -256,7 +248,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bllvm-node"
+name = "blvm-node"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
@@ -265,8 +257,8 @@ dependencies = [
  "bech32",
  "bincode",
  "bitflags 2.10.0",
- "bllvm-consensus 0.1.6",
- "bllvm-protocol",
+ "blvm-consensus",
+ "blvm-protocol",
  "bytes",
  "clap",
  "constant_time_eq",
@@ -308,13 +300,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "bllvm-protocol"
+name = "blvm-protocol"
 version = "0.1.3"
 dependencies = [
  "anyhow",
  "bech32",
  "bincode",
- "bllvm-consensus 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "blvm-consensus",
  "crc32fast",
  "hex",
  "ripemd",
@@ -323,15 +315,6 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
-]
-
-[[package]]
-name = "block-buffer"
-version = "0.10.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
-dependencies = [
- "generic-array",
 ]
 
 [[package]]
@@ -2972,3 +2955,7 @@ dependencies = [
  "system-deps",
  "zeromq-src",
 ]
+
+[[patch.unused]]
+name = "blvm-sdk"
+version = "0.1.0"

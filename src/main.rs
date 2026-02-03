@@ -4,20 +4,21 @@
 //! webhook notifications, economic node tracking, and veto system integration.
 
 use anyhow::Result;
-use bllvm_node::module::ipc::protocol::{EventMessage, EventPayload, EventType, LogLevel, ModuleMessage};
+use blvm_node::module::ipc::protocol::{EventMessage, EventPayload, LogLevel, ModuleMessage};
+use blvm_node::module::EventType;
 use clap::Parser;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
-mod webhook;
+mod client;
 mod economic_nodes;
 mod error;
-mod client;
 mod nodeapi_ipc;
+mod webhook;
 
-use error::GovernanceError;
 use client::ModuleClient;
+use error::GovernanceError;
 use nodeapi_ipc::NodeApiIpc;
 
 /// Command-line arguments for the module
@@ -47,25 +48,37 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     // Get module ID (from args or environment)
-    let module_id = args.module_id
+    let module_id = args
+        .module_id
         .or_else(|| std::env::var("MODULE_NAME").ok())
         .unwrap_or_else(|| "bllvm-governance".to_string());
 
     // Get socket path (from args, env, or default)
-    let socket_path = args.socket_path
+    let socket_path = args
+        .socket_path
         .or_else(|| std::env::var("BLLVM_MODULE_SOCKET").ok().map(PathBuf::from))
-        .or_else(|| std::env::var("MODULE_SOCKET_DIR").ok().map(|d| PathBuf::from(d).join("modules.sock")))
+        .or_else(|| {
+            std::env::var("MODULE_SOCKET_DIR")
+                .ok()
+                .map(|d| PathBuf::from(d).join("modules.sock"))
+        })
         .unwrap_or_else(|| PathBuf::from("data/modules/modules.sock"));
 
-    info!("bllvm-governance module starting... (module_id: {}, socket: {:?})", module_id, socket_path);
+    info!(
+        "bllvm-governance module starting... (module_id: {}, socket: {:?})",
+        module_id, socket_path
+    );
 
     // Connect to node
+    let socket_path_for_ctx = socket_path.clone();
     let mut client = match ModuleClient::connect(
         socket_path,
         module_id.clone(),
         "bllvm-governance".to_string(),
         env!("CARGO_PKG_VERSION").to_string(),
-    ).await {
+    )
+    .await
+    {
         Ok(client) => client,
         Err(e) => {
             error!("Failed to connect to node: {}", e);
@@ -93,16 +106,21 @@ async fn main() -> Result<()> {
     let node_api = Arc::new(NodeApiIpc::new(ipc_client));
 
     // Create webhook client and economic node registry
-    let ctx = bllvm_node::module::traits::ModuleContext {
+    let data_dir = args
+        .data_dir
+        .unwrap_or_else(|| PathBuf::from("data/modules/blvm-governance"));
+    let ctx = blvm_node::module::traits::ModuleContext {
         module_id: module_id.clone(),
         config: std::collections::HashMap::new(),
-        data_dir: args.data_dir.unwrap_or_else(|| PathBuf::from("data/modules/bllvm-governance")),
-        socket_path: socket_path.to_string_lossy().to_string(),
+        data_dir: data_dir.to_string_lossy().to_string(),
+        socket_path: socket_path_for_ctx.to_string_lossy().to_string(),
     };
 
-    let webhook_client = webhook::GovernanceWebhookClient::new(&ctx).await
+    let webhook_client = webhook::GovernanceWebhookClient::new(&ctx)
+        .await
         .map_err(|e| anyhow::anyhow!("Failed to create webhook client: {}", e))?;
-    let economic_nodes = economic_nodes::EconomicNodeRegistry::new(&ctx, Arc::clone(&node_api)).await
+    let economic_nodes = economic_nodes::EconomicNodeRegistry::new(&ctx, node_api.clone())
+        .await
         .map_err(|e| anyhow::anyhow!("Failed to create economic node registry: {}", e))?;
 
     info!("Governance module initialized and running");

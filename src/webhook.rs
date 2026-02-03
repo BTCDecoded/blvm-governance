@@ -1,8 +1,10 @@
 //! Governance webhook client
 
 use crate::error::GovernanceError;
-use bllvm_node::module::ipc::protocol::ModuleMessage;
-use bllvm_node::module::traits::{EventPayload, EventType, NodeAPI};
+use blvm_node::module::ipc::protocol::EventPayload;
+use blvm_node::module::ipc::protocol::ModuleMessage;
+use blvm_node::module::traits::NodeAPI;
+use blvm_node::module::EventType;
 use reqwest::Client;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -17,22 +19,29 @@ pub struct GovernanceWebhookClient {
 
 impl GovernanceWebhookClient {
     /// Create a new webhook client
-    pub async fn new(ctx: &bllvm_node::module::traits::ModuleContext) -> Result<Self, GovernanceError> {
+    pub async fn new(
+        ctx: &blvm_node::module::traits::ModuleContext,
+    ) -> Result<Self, GovernanceError> {
         let webhook_url = ctx.get_config("governance.webhook_url").cloned();
         let node_id = ctx.get_config("governance.node_id").cloned();
         let enabled = webhook_url.is_some();
-        
+
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
-            .map_err(|e| GovernanceError::WebhookError(format!("Failed to create HTTP client: {}", e)))?;
-        
+            .map_err(|e| {
+                GovernanceError::WebhookError(format!("Failed to create HTTP client: {}", e))
+            })?;
+
         if enabled {
-            info!("Governance webhook client initialized: {}", webhook_url.as_ref().unwrap());
+            info!(
+                "Governance webhook client initialized: {}",
+                webhook_url.as_ref().unwrap()
+            );
         } else {
             debug!("Governance webhook client disabled (no URL configured)");
         }
-        
+
         Ok(Self {
             client,
             webhook_url,
@@ -40,7 +49,7 @@ impl GovernanceWebhookClient {
             enabled,
         })
     }
-    
+
     /// Handle an event from the node
     pub async fn handle_event(
         &self,
@@ -50,7 +59,7 @@ impl GovernanceWebhookClient {
         if !self.enabled {
             return Ok(());
         }
-        
+
         match event {
             ModuleMessage::Event(event_msg) => {
                 match event_msg.event_type {
@@ -65,19 +74,25 @@ impl GovernanceWebhookClient {
                     EventType::GovernanceProposalCreated => {
                         if let EventPayload::GovernanceProposalCreated {
                             proposal_id,
+                            repository,
+                            pr_number,
                             tier,
-                            author,
-                            block_height,
                         } = &event_msg.payload
                         {
-                            info!("Governance proposal created: id={}, tier={:?}, author={}, height={}",
-                                proposal_id, tier, author, block_height);
-                            self.notify_governance_event("proposal_created", serde_json::json!({
-                                "proposal_id": proposal_id,
-                                "tier": format!("{:?}", tier),
-                                "author": author,
-                                "block_height": block_height,
-                            })).await?;
+                            info!(
+                                "Governance proposal created: id={}, repository={}, pr={}, tier={}",
+                                proposal_id, repository, pr_number, tier
+                            );
+                            self.notify_governance_event(
+                                "proposal_created",
+                                serde_json::json!({
+                                    "proposal_id": proposal_id,
+                                    "repository": repository,
+                                    "pr_number": pr_number,
+                                    "tier": tier,
+                                }),
+                            )
+                            .await?;
                         }
                     }
                     EventType::GovernanceProposalVoted => {
@@ -85,33 +100,43 @@ impl GovernanceWebhookClient {
                             proposal_id,
                             voter,
                             vote,
-                            block_height,
                         } = &event_msg.payload
                         {
-                            info!("Governance proposal voted: id={}, voter={}, vote={:?}, height={}",
-                                proposal_id, voter, vote, block_height);
-                            self.notify_governance_event("proposal_voted", serde_json::json!({
-                                "proposal_id": proposal_id,
-                                "voter": voter,
-                                "vote": format!("{:?}", vote),
-                                "block_height": block_height,
-                            })).await?;
+                            info!(
+                                "Governance proposal voted: id={}, voter={}, vote={}",
+                                proposal_id, voter, vote
+                            );
+                            self.notify_governance_event(
+                                "proposal_voted",
+                                serde_json::json!({
+                                    "proposal_id": proposal_id,
+                                    "voter": voter,
+                                    "vote": vote,
+                                }),
+                            )
+                            .await?;
                         }
                     }
                     EventType::GovernanceProposalMerged => {
                         if let EventPayload::GovernanceProposalMerged {
                             proposal_id,
-                            merged_at,
-                            block_height,
+                            repository,
+                            pr_number,
                         } = &event_msg.payload
                         {
-                            info!("Governance proposal merged: id={}, merged_at={}, height={}",
-                                proposal_id, merged_at, block_height);
-                            self.notify_governance_event("proposal_merged", serde_json::json!({
-                                "proposal_id": proposal_id,
-                                "merged_at": merged_at,
-                                "block_height": block_height,
-                            })).await?;
+                            info!(
+                                "Governance proposal merged: id={}, repository={}, pr={}",
+                                proposal_id, repository, pr_number
+                            );
+                            self.notify_governance_event(
+                                "proposal_merged",
+                                serde_json::json!({
+                                    "proposal_id": proposal_id,
+                                    "repository": repository,
+                                    "pr_number": pr_number,
+                                }),
+                            )
+                            .await?;
                         }
                     }
                     _ => {
@@ -123,10 +148,10 @@ impl GovernanceWebhookClient {
                 // Not an event message
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Notify governance app about a governance event
     async fn notify_governance_event(
         &self,
@@ -136,9 +161,9 @@ impl GovernanceWebhookClient {
         if !self.enabled {
             return Ok(());
         }
-        
+
         let url = self.webhook_url.as_ref().unwrap();
-        
+
         // Prepare payload
         let payload = serde_json::json!({
             "event_type": event_type,
@@ -149,42 +174,56 @@ impl GovernanceWebhookClient {
                 .unwrap()
                 .as_secs(),
         });
-        
+
         // Send webhook (fire and forget)
         let client = self.client.clone();
         let url = url.clone();
         let event_type_str = event_type.to_string();
-        
+
         tokio::spawn(async move {
             match client.post(&url).json(&payload).send().await {
                 Ok(response) => {
                     if response.status().is_success() {
-                        debug!("Governance webhook sent successfully: event_type={}", event_type_str);
+                        debug!(
+                            "Governance webhook sent successfully: event_type={}",
+                            event_type_str
+                        );
                     } else {
-                        warn!("Governance webhook returned error status {} for event_type={}",
-                            response.status(), event_type_str);
+                        warn!(
+                            "Governance webhook returned error status {} for event_type={}",
+                            response.status(),
+                            event_type_str
+                        );
                     }
                 }
                 Err(e) => {
-                    warn!("Failed to send governance webhook for event_type={}: {}", event_type_str, e);
+                    warn!(
+                        "Failed to send governance webhook for event_type={}: {}",
+                        event_type_str, e
+                    );
                 }
             }
         });
-        
+
         Ok(())
     }
-    
+
     /// Notify governance app about a new block
-    async fn notify_block(&self, block: &bllvm_protocol::Block, height: u64) -> Result<(), GovernanceError> {
+    async fn notify_block(
+        &self,
+        block: &blvm_protocol::Block,
+        height: u64,
+    ) -> Result<(), GovernanceError> {
         let url = self.webhook_url.as_ref().unwrap();
-        
+
         // Calculate block hash
         let block_hash = self.calculate_block_hash(block);
-        
+
         // Serialize block to JSON
-        let block_json = serde_json::to_value(block)
-            .map_err(|e| GovernanceError::WebhookError(format!("Failed to serialize block: {}", e)))?;
-        
+        let block_json = serde_json::to_value(block).map_err(|e| {
+            GovernanceError::WebhookError(format!("Failed to serialize block: {}", e))
+        })?;
+
         // Prepare payload
         let payload = serde_json::json!({
             "block_hash": hex::encode(block_hash),
@@ -192,13 +231,13 @@ impl GovernanceWebhookClient {
             "block": block_json,
             "contributor_id": self.node_id.as_deref(),
         });
-        
+
         // Send webhook (fire and forget)
         let client = self.client.clone();
         let url = url.clone();
         let block_hash_str = hex::encode(block_hash);
         let height_clone = height;
-        
+
         tokio::spawn(async move {
             match client.post(&url).json(&payload).send().await {
                 Ok(response) => {
@@ -224,14 +263,14 @@ impl GovernanceWebhookClient {
                 }
             }
         });
-        
+
         Ok(())
     }
-    
+
     /// Calculate block hash (double SHA256 of block header)
-    fn calculate_block_hash(&self, block: &bllvm_protocol::Block) -> [u8; 32] {
+    fn calculate_block_hash(&self, block: &blvm_protocol::Block) -> [u8; 32] {
         use sha2::{Digest, Sha256};
-        
+
         // Serialize block header
         let mut header_data = Vec::new();
         header_data.extend_from_slice(&(block.header.version as u32).to_le_bytes());
@@ -240,14 +279,13 @@ impl GovernanceWebhookClient {
         header_data.extend_from_slice(&block.header.timestamp.to_le_bytes());
         header_data.extend_from_slice(&block.header.bits.to_le_bytes());
         header_data.extend_from_slice(&block.header.nonce.to_le_bytes());
-        
+
         // Double SHA256
         let first_hash = Sha256::digest(&header_data);
         let second_hash = Sha256::digest(first_hash);
-        
+
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&second_hash);
         hash
     }
 }
-
