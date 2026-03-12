@@ -1,6 +1,6 @@
-//! bllvm-governance - Governance webhook and economic node tracking module
+//! blvm-governance - Governance webhook and economic node tracking module
 //!
-//! This module provides governance integration for bllvm-node, including
+//! This module provides governance integration for blvm-node, including
 //! webhook notifications, economic node tracking, and veto system integration.
 
 use anyhow::Result;
@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
     let module_id = args
         .module_id
         .or_else(|| std::env::var("MODULE_NAME").ok())
-        .unwrap_or_else(|| "bllvm-governance".to_string());
+        .unwrap_or_else(|| "blvm-governance".to_string());
 
     // Get socket path (from args, env, or default)
     let socket_path = args
@@ -65,7 +65,7 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| PathBuf::from("data/modules/modules.sock"));
 
     info!(
-        "bllvm-governance module starting... (module_id: {}, socket: {:?})",
+        "blvm-governance module starting... (module_id: {}, socket: {:?})",
         module_id, socket_path
     );
 
@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
     let mut client = match ModuleClient::connect(
         socket_path,
         module_id.clone(),
-        "bllvm-governance".to_string(),
+        "blvm-governance".to_string(),
         env!("CARGO_PKG_VERSION").to_string(),
     )
     .await

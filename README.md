@@ -1,11 +1,11 @@
-# bllvm-governance
+# blvm-governance
 
-Governance webhook and economic node tracking module for bllvm-node.
+Governance webhook and economic node tracking module for blvm-node.
 
 ## Overview
 
-This module provides governance integration for bllvm-node, including:
-- Webhook notifications to bllvm-commons
+This module provides governance integration for blvm-node, including:
+- Webhook notifications to blvm-commons
 - Economic node tracking
 - Veto system integration
 - Governance proposal monitoring
@@ -14,11 +14,11 @@ This module provides governance integration for bllvm-node, including:
 
 ```bash
 # Install via cargo
-cargo install bllvm-governance
+cargo install blvm-governance
 
-# Or install via cargo-bllvm-module
-cargo install cargo-bllvm-module
-cargo bllvm-module install bllvm-governance
+# Or install via cargo-blvm-module
+cargo install cargo-blvm-module
+cargo blvm-module install blvm-governance
 ```
 
 ## Configuration
@@ -37,11 +37,11 @@ enabled = true
 The module includes a `module.toml` manifest:
 
 ```toml
-name = "bllvm-governance"
+name = "blvm-governance"
 version = "0.1.0"
 description = "Governance webhook and economic node tracking module"
 author = "Bitcoin Commons Team"
-entry_point = "bllvm-governance"
+entry_point = "blvm-governance"
 
 capabilities = [
     "read_blockchain",

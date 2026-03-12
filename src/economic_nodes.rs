@@ -419,11 +419,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_economic_node_registration() {
+        let temp = std::env::temp_dir();
         let ctx = ModuleContext {
             module_id: "test".to_string(),
             config: HashMap::new(),
-            data_dir: std::path::PathBuf::from("/tmp"),
-            socket_path: "/tmp/test.sock".to_string(),
+            data_dir: temp.clone(),
+            socket_path: temp.join("blvm_test.sock").to_string_lossy().into_owned(),
         };
 
         let node_api = Arc::new(MockNodeAPI { block_height: 100 });
