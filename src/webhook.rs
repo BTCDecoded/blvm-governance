@@ -6,7 +6,6 @@ use blvm_node::module::ipc::protocol::ModuleMessage;
 use blvm_node::module::traits::NodeAPI;
 use blvm_node::module::EventType;
 use reqwest::Client;
-use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// Governance webhook client
@@ -18,6 +17,21 @@ pub struct GovernanceWebhookClient {
 }
 
 impl GovernanceWebhookClient {
+    /// Whether the webhook is configured and enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Webhook URL if configured.
+    pub fn webhook_url(&self) -> Option<&str> {
+        self.webhook_url.as_deref()
+    }
+
+    /// Node ID if configured.
+    pub fn node_id(&self) -> Option<&str> {
+        self.node_id.as_deref()
+    }
+
     /// Create a new webhook client
     pub async fn new(
         ctx: &blvm_node::module::traits::ModuleContext,
@@ -67,7 +81,7 @@ impl GovernanceWebhookClient {
                         if let EventPayload::NewBlock { block_hash, height } = &event_msg.payload {
                             // Get block data
                             if let Ok(Some(block)) = node_api.get_block(block_hash).await {
-                                self.notify_block(&block, *height).await?;
+                                self.notify_block(&block, *height, node_api).await?;
                             }
                         }
                     }
@@ -91,6 +105,7 @@ impl GovernanceWebhookClient {
                                     "pr_number": pr_number,
                                     "tier": tier,
                                 }),
+                                node_api,
                             )
                             .await?;
                         }
@@ -113,6 +128,7 @@ impl GovernanceWebhookClient {
                                     "voter": voter,
                                     "vote": vote,
                                 }),
+                                node_api,
                             )
                             .await?;
                         }
@@ -135,6 +151,7 @@ impl GovernanceWebhookClient {
                                     "repository": repository,
                                     "pr_number": pr_number,
                                 }),
+                                node_api,
                             )
                             .await?;
                         }
@@ -157,6 +174,7 @@ impl GovernanceWebhookClient {
         &self,
         event_type: &str,
         data: serde_json::Value,
+        node_api: &dyn NodeAPI,
     ) -> Result<(), GovernanceError> {
         if !self.enabled {
             return Ok(());
@@ -175,35 +193,47 @@ impl GovernanceWebhookClient {
                 .as_secs(),
         });
 
-        // Send webhook (fire and forget)
-        let client = self.client.clone();
-        let url = url.clone();
-        let event_type_str = event_type.to_string();
-
-        tokio::spawn(async move {
-            match client.post(&url).json(&payload).send().await {
-                Ok(response) => {
-                    if response.status().is_success() {
-                        debug!(
-                            "Governance webhook sent successfully: event_type={}",
-                            event_type_str
-                        );
-                    } else {
-                        warn!(
-                            "Governance webhook returned error status {} for event_type={}",
-                            response.status(),
-                            event_type_str
-                        );
-                    }
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to send governance webhook for event_type={}: {}",
-                        event_type_str, e
+        // Send webhook and publish WebhookSent/WebhookFailed
+        match self.client.post(url).json(&payload).send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    debug!(
+                        "Governance webhook sent successfully: event_type={}",
+                        event_type
                     );
+                    let payload = EventPayload::WebhookSent {
+                        webhook_url: url.clone(),
+                        event_type: event_type.to_string(),
+                        success: true,
+                    };
+                    let _ = node_api.publish_event(EventType::WebhookSent, payload).await;
+                } else {
+                    warn!(
+                        "Governance webhook returned error status {} for event_type={}",
+                        response.status(),
+                        event_type
+                    );
+                    let payload = EventPayload::WebhookFailed {
+                        webhook_url: url.clone(),
+                        event_type: event_type.to_string(),
+                        error: format!("HTTP {}", response.status()),
+                    };
+                    let _ = node_api.publish_event(EventType::WebhookFailed, payload).await;
                 }
             }
-        });
+            Err(e) => {
+                warn!(
+                    "Failed to send governance webhook for event_type={}: {}",
+                    event_type, e
+                );
+                let payload = EventPayload::WebhookFailed {
+                    webhook_url: url.clone(),
+                    event_type: event_type.to_string(),
+                    error: e.to_string(),
+                };
+                let _ = node_api.publish_event(EventType::WebhookFailed, payload).await;
+            }
+        }
 
         Ok(())
     }
@@ -213,7 +243,12 @@ impl GovernanceWebhookClient {
         &self,
         block: &blvm_protocol::Block,
         height: u64,
+        node_api: &dyn NodeAPI,
     ) -> Result<(), GovernanceError> {
+        if !self.enabled {
+            return Ok(());
+        }
+
         let url = self.webhook_url.as_ref().unwrap();
 
         // Calculate block hash
@@ -232,37 +267,53 @@ impl GovernanceWebhookClient {
             "contributor_id": self.node_id.as_deref(),
         });
 
-        // Send webhook (fire and forget)
-        let client = self.client.clone();
-        let url = url.clone();
-        let block_hash_str = hex::encode(block_hash);
-        let height_clone = height;
+        let event_type = "block";
 
-        tokio::spawn(async move {
-            match client.post(&url).json(&payload).send().await {
-                Ok(response) => {
-                    if response.status().is_success() {
-                        debug!(
-                            "Governance webhook sent successfully for block {} at height {}",
-                            block_hash_str, height_clone
-                        );
-                    } else {
-                        warn!(
-                            "Governance webhook returned error status {} for block {} at height {}",
-                            response.status(),
-                            block_hash_str,
-                            height_clone
-                        );
-                    }
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to send governance webhook for block {} at height {}: {}",
-                        block_hash_str, height_clone, e
+        // Send webhook and publish WebhookSent/WebhookFailed
+        match self.client.post(url).json(&payload).send().await {
+            Ok(response) => {
+                if response.status().is_success() {
+                    debug!(
+                        "Governance webhook sent successfully for block {} at height {}",
+                        hex::encode(block_hash),
+                        height
                     );
+                    let payload = EventPayload::WebhookSent {
+                        webhook_url: url.clone(),
+                        event_type: event_type.to_string(),
+                        success: true,
+                    };
+                    let _ = node_api.publish_event(EventType::WebhookSent, payload).await;
+                } else {
+                    warn!(
+                        "Governance webhook returned error status {} for block {} at height {}",
+                        response.status(),
+                        hex::encode(block_hash),
+                        height
+                    );
+                    let payload = EventPayload::WebhookFailed {
+                        webhook_url: url.clone(),
+                        event_type: event_type.to_string(),
+                        error: format!("HTTP {}", response.status()),
+                    };
+                    let _ = node_api.publish_event(EventType::WebhookFailed, payload).await;
                 }
             }
-        });
+            Err(e) => {
+                warn!(
+                    "Failed to send governance webhook for block {} at height {}: {}",
+                    hex::encode(block_hash),
+                    height,
+                    e
+                );
+                let payload = EventPayload::WebhookFailed {
+                    webhook_url: url.clone(),
+                    event_type: event_type.to_string(),
+                    error: e.to_string(),
+                };
+                let _ = node_api.publish_event(EventType::WebhookFailed, payload).await;
+            }
+        }
 
         Ok(())
     }
