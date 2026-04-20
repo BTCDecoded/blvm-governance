@@ -48,10 +48,9 @@ impl GovernanceWebhookClient {
             })?;
 
         if enabled {
-            info!(
-                "Governance webhook client initialized: {}",
-                webhook_url.as_ref().unwrap()
-            );
+            if let Some(ref url) = webhook_url {
+                info!("Governance webhook client initialized: {}", url);
+            }
         } else {
             debug!("Governance webhook client disabled (no URL configured)");
         }
@@ -180,7 +179,9 @@ impl GovernanceWebhookClient {
             return Ok(());
         }
 
-        let url = self.webhook_url.as_ref().unwrap();
+        let Some(url) = self.webhook_url.as_ref() else {
+            return Ok(());
+        };
 
         // Prepare payload
         let payload = serde_json::json!({
@@ -189,7 +190,7 @@ impl GovernanceWebhookClient {
             "node_id": self.node_id.as_deref(),
             "timestamp": std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
         });
 
@@ -249,7 +250,9 @@ impl GovernanceWebhookClient {
             return Ok(());
         }
 
-        let url = self.webhook_url.as_ref().unwrap();
+        let Some(url) = self.webhook_url.as_ref() else {
+            return Ok(());
+        };
 
         // Calculate block hash
         let block_hash = self.calculate_block_hash(block);

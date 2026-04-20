@@ -385,4 +385,91 @@ impl NodeAPI for MockNodeAPI {
             "not implemented".into(),
         ))
     }
+    async fn merge_block_serve_denylist(
+        &self,
+        _: &[blvm_protocol::Hash],
+    ) -> Result<(), blvm_node::module::traits::ModuleError> {
+        Ok(())
+    }
+
+    async fn get_block_serve_denylist_snapshot(
+        &self,
+    ) -> Result<
+        blvm_node::module::traits::BlockServeDenylistSnapshot,
+        blvm_node::module::traits::ModuleError,
+    > {
+        Ok(blvm_node::module::traits::BlockServeDenylistSnapshot {
+            total_count: 0,
+            truncated: false,
+            hashes: vec![],
+        })
+    }
+
+    async fn clear_block_serve_denylist(&self) -> Result<(), blvm_node::module::traits::ModuleError> {
+        Ok(())
+    }
+
+    async fn replace_block_serve_denylist(
+        &self,
+        _: &[blvm_protocol::Hash],
+    ) -> Result<(), blvm_node::module::traits::ModuleError> {
+        Ok(())
+    }
+
+    async fn merge_tx_serve_denylist(
+        &self,
+        _: &[blvm_protocol::Hash],
+    ) -> Result<(), blvm_node::module::traits::ModuleError> {
+        Ok(())
+    }
+
+    async fn get_tx_serve_denylist_snapshot(
+        &self,
+    ) -> Result<
+        blvm_node::module::traits::TxServeDenylistSnapshot,
+        blvm_node::module::traits::ModuleError,
+    > {
+        Ok(blvm_node::module::traits::TxServeDenylistSnapshot {
+            total_count: 0,
+            truncated: false,
+            hashes: vec![],
+        })
+    }
+
+    async fn clear_tx_serve_denylist(&self) -> Result<(), blvm_node::module::traits::ModuleError> {
+        Ok(())
+    }
+
+    async fn replace_tx_serve_denylist(
+        &self,
+        _: &[blvm_protocol::Hash],
+    ) -> Result<(), blvm_node::module::traits::ModuleError> {
+        Ok(())
+    }
+
+    async fn get_sync_status(
+        &self,
+    ) -> Result<blvm_node::module::traits::SyncStatus, blvm_node::module::traits::ModuleError> {
+        Ok(blvm_node::module::traits::SyncStatus {
+            phase: "Synced".into(),
+            progress: 1.0,
+            is_synced: true,
+            error_message: None,
+        })
+    }
+
+    async fn ban_peer(
+        &self,
+        _: &str,
+        _: Option<u64>,
+    ) -> Result<(), blvm_node::module::traits::ModuleError> {
+        Ok(())
+    }
+
+    async fn set_block_serve_maintenance_mode(
+        &self,
+        _: bool,
+    ) -> Result<(), blvm_node::module::traits::ModuleError> {
+        Ok(())
+    }
 }

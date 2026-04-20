@@ -1,11 +1,11 @@
 //! Governance module: unified CLI via #[module] macro.
 
 use blvm_node::module::ipc::protocol::{EventMessage, ModuleMessage};
+use blvm_node::module::traits::ModuleError;
 use blvm_sdk::module::prelude::*;
 use blvm_sdk_macros::module;
 use std::sync::Arc;
 
-use crate::economic_nodes::EconomicNodeRegistry;
 use crate::proposals::ProposalStore;
 use crate::webhook::GovernanceWebhookClient;
 
@@ -14,20 +14,24 @@ use crate::webhook::GovernanceWebhookClient;
 pub struct GovernanceModule {
     pub proposal_store: Arc<ProposalStore>,
     pub webhook_client: Arc<GovernanceWebhookClient>,
-    pub economic_nodes: Arc<EconomicNodeRegistry>,
 }
 
 #[module]
 impl GovernanceModule {
-    #[on_event(GovernanceProposalCreated, GovernanceProposalVoted, GovernanceProposalMerged, EconomicNodeRegistered, EconomicNodeVeto, NewBlock)]
-    async fn on_governance_event(&self, event: &EventMessage, ctx: &InvocationContext) -> Result<(), ModuleError> {
+    #[on_event(GovernanceProposalCreated, GovernanceProposalVoted, GovernanceProposalMerged, NewBlock)]
+    async fn on_governance_event(
+        &self,
+        event: &EventMessage,
+        ctx: &InvocationContext,
+    ) -> Result<(), ModuleError> {
         let msg = ModuleMessage::Event(event.clone());
-        let api = ctx.node_api().expect("node_api required");
+        let Some(api) = ctx.node_api() else {
+            return Err(ModuleError::OperationError(
+                "Node API is required for governance event handling".to_string(),
+            ));
+        };
         if let Err(e) = self.webhook_client.handle_event(&msg, api.as_ref()).await {
             tracing::warn!("Error handling event in webhook client: {}", e);
-        }
-        if let Err(e) = self.economic_nodes.handle_event(&msg, api.as_ref()).await {
-            tracing::warn!("Error handling event in economic node registry: {}", e);
         }
         if let Err(e) = self.proposal_store.handle_event(&msg) {
             tracing::warn!("Error handling event in proposal store: {}", e);
@@ -54,7 +58,12 @@ impl GovernanceModule {
             };
             out.push_str(&format!(
                 "  {}. {} | {}#{} | {} | {} votes\n",
-                i + 1, p.proposal_id, p.repository, p.pr_number, status, p.votes.len(),
+                i + 1,
+                p.proposal_id,
+                p.repository,
+                p.pr_number,
+                status,
+                p.votes.len(),
             ));
         }
         Ok(out)
@@ -63,7 +72,8 @@ impl GovernanceModule {
     /// Send a test webhook payload to verify configuration.
     #[command]
     fn webhook_test(&self, _ctx: &InvocationContext) -> Result<String, ModuleError> {
-        let data_dir = std::env::var("DATA_DIR").unwrap_or_else(|_| "data/modules/blvm-governance".into());
+        let data_dir =
+            std::env::var("DATA_DIR").unwrap_or_else(|_| "data/modules/blvm-governance".into());
         let config_path = std::path::Path::new(&data_dir).join("config.toml");
         let config = crate::GovernanceConfig::load(&config_path).unwrap_or_default();
         let Some(url) = &config.webhook_url else {
@@ -89,7 +99,8 @@ impl GovernanceModule {
     /// Show module status.
     #[command]
     fn status(&self, _ctx: &InvocationContext) -> Result<String, ModuleError> {
-        let data_dir = std::env::var("DATA_DIR").unwrap_or_else(|_| "data/modules/blvm-governance".into());
+        let data_dir =
+            std::env::var("DATA_DIR").unwrap_or_else(|_| "data/modules/blvm-governance".into());
         let config_path = std::path::Path::new(&data_dir).join("config.toml");
         let config = crate::GovernanceConfig::load(&config_path).unwrap_or_default();
         Ok(format!(
@@ -103,17 +114,13 @@ impl GovernanceModule {
 }
 
 impl GovernanceModule {
-    /// Handle node events: webhook, economic nodes, proposal store.
+    /// Handle node events: webhook and proposal store.
     pub async fn handle_event(
         &self,
         event: &blvm_node::module::ipc::protocol::ModuleMessage,
         node_api: &dyn blvm_node::module::traits::NodeAPI,
     ) -> Result<(), blvm_node::module::traits::ModuleError> {
         self.webhook_client
-            .handle_event(event, node_api)
-            .await
-            .map_err(|e| blvm_node::module::traits::ModuleError::Other(e.to_string()))?;
-        self.economic_nodes
             .handle_event(event, node_api)
             .await
             .map_err(|e| blvm_node::module::traits::ModuleError::Other(e.to_string()))?;

@@ -55,15 +55,17 @@ futures = "0.3"
 async-trait = "0.1"
 
 # blvm-sdk for ModuleBootstrap (env-based bootstrap)
-blvm-sdk = { path = "../blvm-sdk", default-features = false, features = ["node"] }
+blvm-sdk = { version = ">=0.1, <1", default-features = false, features = ["node"] }
 # blvm-sdk-macros for #[config]
-blvm-sdk-macros = { path = "../blvm-sdk/crates/blvm-sdk-macros" }
+blvm-sdk-macros = ">=0.1, <1"
 
+# Local monorepo: sibling paths override the version pins above.
 [patch.crates-io]
 blvm-node = { path = "../blvm-node" }
 blvm-protocol = { path = "../blvm-protocol" }
 blvm-consensus = { path = "../blvm-consensus" }
 blvm-sdk = { path = "../blvm-sdk" }
+blvm-sdk-macros = { path = "../blvm-sdk/crates/blvm-sdk-macros" }
 
 [dev-dependencies]
 # Testing

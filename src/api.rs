@@ -10,7 +10,6 @@ use std::sync::Arc;
 /// Governance module API for other modules
 pub struct GovernanceModuleApi {
     proposal_store: Arc<crate::proposals::ProposalStore>,
-    economic_nodes: Arc<crate::economic_nodes::EconomicNodeRegistry>,
     webhook_url: Option<String>,
     node_api: Arc<dyn NodeAPI>,
 }
@@ -18,13 +17,11 @@ pub struct GovernanceModuleApi {
 impl GovernanceModuleApi {
     pub fn new(
         proposal_store: Arc<crate::proposals::ProposalStore>,
-        economic_nodes: Arc<crate::economic_nodes::EconomicNodeRegistry>,
         webhook_url: Option<String>,
         node_api: Arc<dyn NodeAPI>,
     ) -> Self {
         Self {
             proposal_store,
-            economic_nodes,
             webhook_url,
             node_api,
         }
@@ -45,25 +42,6 @@ impl ModuleAPI for GovernanceModuleApi {
                     ModuleError::OperationError(format!("Failed to load proposals: {}", e))
                 })?;
                 serde_json::to_vec(&proposals).map_err(|e| {
-                    ModuleError::OperationError(format!("Serialization error: {}", e))
-                })
-            }
-            "get_economic_nodes" => {
-                let nodes = self.economic_nodes.list_nodes().await;
-                let json_nodes: Vec<serde_json::Value> = nodes
-                    .into_iter()
-                    .map(|n| {
-                        serde_json::json!({
-                            "node_id": hex::encode(n.node_id),
-                            "hashpower_percentage": n.hashpower_percentage,
-                            "economic_activity_percentage": n.economic_activity_percentage,
-                            "registered_at": n.registered_at,
-                            "last_seen": n.last_seen,
-                            "veto_count": n.veto_count,
-                        })
-                    })
-                    .collect();
-                serde_json::to_vec(&json_nodes).map_err(|e| {
                     ModuleError::OperationError(format!("Serialization error: {}", e))
                 })
             }
@@ -198,7 +176,10 @@ impl ModuleAPI for GovernanceModuleApi {
                     .publish_event(EventType::GovernanceProposalMerged, payload)
                     .await
                     .map_err(|e| {
-                        ModuleError::OperationError(format!("Failed to publish proposal merged: {}", e))
+                        ModuleError::OperationError(format!(
+                            "Failed to publish proposal merged: {}",
+                            e
+                        ))
                     })?;
                 serde_json::to_vec(&serde_json::json!({
                     "ok": true,
@@ -217,7 +198,6 @@ impl ModuleAPI for GovernanceModuleApi {
     fn list_methods(&self) -> Vec<String> {
         vec![
             "get_proposals".to_string(),
-            "get_economic_nodes".to_string(),
             "get_webhook_status".to_string(),
             "create_proposal".to_string(),
             "record_proposal_vote".to_string(),

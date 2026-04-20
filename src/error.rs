@@ -10,9 +10,6 @@ pub enum GovernanceError {
     #[error("Webhook error: {0}")]
     WebhookError(String),
 
-    #[error("Economic node error: {0}")]
-    EconomicNodeError(String),
-
     #[error("Configuration error: {0}")]
     ConfigError(String),
 
