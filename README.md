@@ -38,7 +38,7 @@ The module includes a `module.toml` manifest:
 
 ```toml
 name = "blvm-governance"
-version = "0.1.0"
+version = "0.1"
 description = "Governance webhook and economic node tracking module"
 author = "Bitcoin Commons Team"
 entry_point = "blvm-governance"
