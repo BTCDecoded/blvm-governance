@@ -9,3 +9,11 @@ capabilities = [
     "subscribe_events",
 ]
 
+[config_schema]
+webhook_url = "Optional governance webhook URL for proposal notifications"
+
+# Written by release CI — do not edit by hand.
+[downloads]
+x86_64-linux   = { url = "", sha256 = "" }
+aarch64-linux  = { url = "", sha256 = "" }
+x86_64-windows = { url = "", sha256 = "" }
