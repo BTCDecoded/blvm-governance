@@ -221,6 +221,19 @@ impl NodeAPI for MockNodeAPI {
     ) -> Result<(), blvm_node::module::traits::ModuleError> {
         Ok(())
     }
+    async fn register_core_rpc_override(
+        &self,
+        _: String,
+        _: String,
+    ) -> Result<(), blvm_node::module::traits::ModuleError> {
+        Ok(())
+    }
+    async fn unregister_core_rpc_override(
+        &self,
+        _: &str,
+    ) -> Result<(), blvm_node::module::traits::ModuleError> {
+        Ok(())
+    }
     async fn register_timer(
         &self,
         _: u64,
