@@ -18,7 +18,12 @@ pub struct GovernanceModule {
 
 #[module]
 impl GovernanceModule {
-    #[on_event(GovernanceProposalCreated, GovernanceProposalVoted, GovernanceProposalMerged, NewBlock)]
+    #[on_event(
+        GovernanceProposalCreated,
+        GovernanceProposalVoted,
+        GovernanceProposalMerged,
+        NewBlock
+    )]
     async fn on_governance_event(
         &self,
         event: &EventMessage,
@@ -48,7 +53,8 @@ impl GovernanceModule {
             .map_err(|e| ModuleError::Other(e.to_string()))?;
         if proposals.is_empty() {
             return Ok("No proposals yet.\n\
-                Proposals appear when the node publishes GovernanceProposalCreated events.".into());
+                Proposals appear when the node publishes GovernanceProposalCreated events."
+                .into());
         }
         let mut out = format!("Proposals ({}):\n", proposals.len());
         for (i, p) in proposals.iter().enumerate() {
@@ -77,7 +83,9 @@ impl GovernanceModule {
         let config_path = std::path::Path::new(&data_dir).join("config.toml");
         let config = crate::GovernanceConfig::load(&config_path).unwrap_or_default();
         let Some(url) = &config.webhook_url else {
-            return Ok("Webhook not configured (governance.webhook_url). Set in config.toml.".into());
+            return Ok(
+                "Webhook not configured (governance.webhook_url). Set in config.toml.".into(),
+            );
         };
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
@@ -90,7 +98,9 @@ impl GovernanceModule {
         });
         let res = client.post(url).json(&payload).send();
         match res {
-            Ok(r) if r.status().is_success() => Ok(format!("Webhook test OK: {} {}", r.status(), url)),
+            Ok(r) if r.status().is_success() => {
+                Ok(format!("Webhook test OK: {} {}", r.status(), url))
+            }
             Ok(r) => Ok(format!("Webhook returned {}: {}", r.status(), url)),
             Err(e) => Ok(format!("Webhook test failed: {} - {}", url, e)),
         }

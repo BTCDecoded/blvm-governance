@@ -207,7 +207,9 @@ impl GovernanceWebhookClient {
                         event_type: event_type.to_string(),
                         success: true,
                     };
-                    let _ = node_api.publish_event(EventType::WebhookSent, payload).await;
+                    let _ = node_api
+                        .publish_event(EventType::WebhookSent, payload)
+                        .await;
                 } else {
                     warn!(
                         "Governance webhook returned error status {} for event_type={}",
@@ -219,7 +221,9 @@ impl GovernanceWebhookClient {
                         event_type: event_type.to_string(),
                         error: format!("HTTP {}", response.status()),
                     };
-                    let _ = node_api.publish_event(EventType::WebhookFailed, payload).await;
+                    let _ = node_api
+                        .publish_event(EventType::WebhookFailed, payload)
+                        .await;
                 }
             }
             Err(e) => {
@@ -232,7 +236,9 @@ impl GovernanceWebhookClient {
                     event_type: event_type.to_string(),
                     error: e.to_string(),
                 };
-                let _ = node_api.publish_event(EventType::WebhookFailed, payload).await;
+                let _ = node_api
+                    .publish_event(EventType::WebhookFailed, payload)
+                    .await;
             }
         }
 
@@ -286,7 +292,9 @@ impl GovernanceWebhookClient {
                         event_type: event_type.to_string(),
                         success: true,
                     };
-                    let _ = node_api.publish_event(EventType::WebhookSent, payload).await;
+                    let _ = node_api
+                        .publish_event(EventType::WebhookSent, payload)
+                        .await;
                 } else {
                     warn!(
                         "Governance webhook returned error status {} for block {} at height {}",
@@ -299,7 +307,9 @@ impl GovernanceWebhookClient {
                         event_type: event_type.to_string(),
                         error: format!("HTTP {}", response.status()),
                     };
-                    let _ = node_api.publish_event(EventType::WebhookFailed, payload).await;
+                    let _ = node_api
+                        .publish_event(EventType::WebhookFailed, payload)
+                        .await;
                 }
             }
             Err(e) => {
@@ -314,7 +324,9 @@ impl GovernanceWebhookClient {
                     event_type: event_type.to_string(),
                     error: e.to_string(),
                 };
-                let _ = node_api.publish_event(EventType::WebhookFailed, payload).await;
+                let _ = node_api
+                    .publish_event(EventType::WebhookFailed, payload)
+                    .await;
             }
         }
 

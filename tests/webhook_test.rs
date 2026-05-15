@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 #[tokio::test]
 async fn test_webhook_client_disabled() {
-    let mut config = HashMap::new();
+    let config = HashMap::new();
     let temp = std::env::temp_dir();
     let ctx = ModuleContext {
         module_id: "test".to_string(),
@@ -56,6 +56,9 @@ async fn test_webhook_client_enabled() {
 
     let client = GovernanceWebhookClient::new(&ctx).await.unwrap();
     assert!(client.is_enabled());
-    assert_eq!(client.webhook_url().unwrap(), "http://localhost:8080/webhook");
+    assert_eq!(
+        client.webhook_url().unwrap(),
+        "http://localhost:8080/webhook"
+    );
     assert_eq!(client.node_id().unwrap(), "test_node");
 }

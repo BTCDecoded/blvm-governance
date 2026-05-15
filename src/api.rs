@@ -2,8 +2,8 @@
 //!
 //! Exposes governance data to other modules via call_module.
 
-use blvm_node::module::ipc::protocol::EventPayload;
 use blvm_node::module::inter_module::api::ModuleAPI;
+use blvm_node::module::ipc::protocol::EventPayload;
 use blvm_node::module::traits::{EventType, ModuleError, NodeAPI};
 use std::sync::Arc;
 
@@ -41,22 +41,20 @@ impl ModuleAPI for GovernanceModuleApi {
                 let proposals = self.proposal_store.load_proposals().map_err(|e| {
                     ModuleError::OperationError(format!("Failed to load proposals: {}", e))
                 })?;
-                serde_json::to_vec(&proposals).map_err(|e| {
-                    ModuleError::OperationError(format!("Serialization error: {}", e))
-                })
+                serde_json::to_vec(&proposals)
+                    .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
             }
             "get_webhook_status" => {
                 let status = serde_json::json!({
                     "enabled": self.webhook_url.is_some(),
                     "url": self.webhook_url.as_deref(),
                 });
-                serde_json::to_vec(&status).map_err(|e| {
-                    ModuleError::OperationError(format!("Serialization error: {}", e))
-                })
+                serde_json::to_vec(&status)
+                    .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
             }
             "create_proposal" => {
-                let params_json: serde_json::Value = serde_json::from_slice(params)
-                    .unwrap_or(serde_json::json!({}));
+                let params_json: serde_json::Value =
+                    serde_json::from_slice(params).unwrap_or(serde_json::json!({}));
                 let proposal_id = params_json
                     .get("proposal_id")
                     .and_then(|v| v.as_str())
@@ -99,13 +97,11 @@ impl ModuleAPI for GovernanceModuleApi {
                     "pr_number": pr_number,
                     "tier": tier
                 }))
-                .map_err(|e| {
-                    ModuleError::OperationError(format!("Serialization error: {}", e))
-                })
+                .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
             }
             "record_proposal_vote" => {
-                let params_json: serde_json::Value = serde_json::from_slice(params)
-                    .unwrap_or(serde_json::json!({}));
+                let params_json: serde_json::Value =
+                    serde_json::from_slice(params).unwrap_or(serde_json::json!({}));
                 let proposal_id = params_json
                     .get("proposal_id")
                     .and_then(|v| v.as_str())
@@ -134,7 +130,10 @@ impl ModuleAPI for GovernanceModuleApi {
                     .publish_event(EventType::GovernanceProposalVoted, payload)
                     .await
                     .map_err(|e| {
-                        ModuleError::OperationError(format!("Failed to publish proposal vote: {}", e))
+                        ModuleError::OperationError(format!(
+                            "Failed to publish proposal vote: {}",
+                            e
+                        ))
                     })?;
                 serde_json::to_vec(&serde_json::json!({
                     "ok": true,
@@ -142,13 +141,11 @@ impl ModuleAPI for GovernanceModuleApi {
                     "voter": voter,
                     "vote": vote
                 }))
-                .map_err(|e| {
-                    ModuleError::OperationError(format!("Serialization error: {}", e))
-                })
+                .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
             }
             "record_proposal_merged" => {
-                let params_json: serde_json::Value = serde_json::from_slice(params)
-                    .unwrap_or(serde_json::json!({}));
+                let params_json: serde_json::Value =
+                    serde_json::from_slice(params).unwrap_or(serde_json::json!({}));
                 let proposal_id = params_json
                     .get("proposal_id")
                     .and_then(|v| v.as_str())
@@ -187,11 +184,12 @@ impl ModuleAPI for GovernanceModuleApi {
                     "repository": repository,
                     "pr_number": pr_number
                 }))
-                .map_err(|e| {
-                    ModuleError::OperationError(format!("Serialization error: {}", e))
-                })
+                .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
             }
-            _ => Err(ModuleError::OperationError(format!("Unknown method: {}", method))),
+            _ => Err(ModuleError::OperationError(format!(
+                "Unknown method: {}",
+                method
+            ))),
         }
     }
 

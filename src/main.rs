@@ -5,7 +5,9 @@
 
 use anyhow::Result;
 use blvm_governance::storage::up_v1;
-use blvm_governance::{api::GovernanceModuleApi, proposals, webhook, GovernanceConfig, GovernanceModule};
+use blvm_governance::{
+    api::GovernanceModuleApi, proposals, webhook, GovernanceConfig, GovernanceModule,
+};
 use blvm_sdk::migrations;
 use blvm_sdk::module::{ModuleBootstrap, ModuleDb};
 use std::sync::Arc;
@@ -26,14 +28,15 @@ async fn main() -> Result<()> {
         async move {
             let (ctx, config) = bootstrap.context_with_config::<GovernanceConfig>(&data_dir);
             let webhook_url = config.webhook_url.clone();
-            let webhook_client = webhook::GovernanceWebhookClient::new(&ctx)
-                .await
-                .map_err(|e| {
-                    blvm_node::module::traits::ModuleError::Other(format!(
-                        "Failed to create webhook client: {}",
-                        e
-                    ))
-                })?;
+            let webhook_client =
+                webhook::GovernanceWebhookClient::new(&ctx)
+                    .await
+                    .map_err(|e| {
+                        blvm_node::module::traits::ModuleError::Other(format!(
+                            "Failed to create webhook client: {}",
+                            e
+                        ))
+                    })?;
             let proposal_store = Arc::new(proposals::ProposalStore::new(Arc::clone(&db)));
             let governance_api = Arc::new(GovernanceModuleApi::new(
                 Arc::clone(&proposal_store),

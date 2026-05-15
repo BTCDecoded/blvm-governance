@@ -1,6 +1,6 @@
 //! Shared test utilities for governance tests
 
-use blvm_node::module::ipc::protocol::{EventMessage, ModuleMessage};
+use blvm_node::module::ipc::protocol::ModuleMessage;
 use blvm_node::module::traits::{EventType, NodeAPI};
 use blvm_protocol::Hash;
 use std::collections::HashMap;
@@ -52,10 +52,8 @@ impl NodeAPI for MockNodeAPI {
     async fn subscribe_events(
         &self,
         _: Vec<EventType>,
-    ) -> Result<
-        tokio::sync::mpsc::Receiver<ModuleMessage>,
-        blvm_node::module::traits::ModuleError,
-    > {
+    ) -> Result<tokio::sync::mpsc::Receiver<ModuleMessage>, blvm_node::module::traits::ModuleError>
+    {
         let (_tx, rx) = tokio::sync::mpsc::channel(100);
         Ok(rx)
     }
@@ -82,10 +80,8 @@ impl NodeAPI for MockNodeAPI {
     }
     async fn get_network_stats(
         &self,
-    ) -> Result<
-        blvm_node::module::traits::NetworkStats,
-        blvm_node::module::traits::ModuleError,
-    > {
+    ) -> Result<blvm_node::module::traits::NetworkStats, blvm_node::module::traits::ModuleError>
+    {
         Ok(blvm_node::module::traits::NetworkStats {
             peer_count: 0,
             hash_rate: 0.0,
@@ -95,16 +91,13 @@ impl NodeAPI for MockNodeAPI {
     }
     async fn get_network_peers(
         &self,
-    ) -> Result<
-        Vec<blvm_node::module::traits::PeerInfo>,
-        blvm_node::module::traits::ModuleError,
-    > {
+    ) -> Result<Vec<blvm_node::module::traits::PeerInfo>, blvm_node::module::traits::ModuleError>
+    {
         Ok(Vec::new())
     }
     async fn get_chain_info(
         &self,
-    ) -> Result<blvm_node::module::traits::ChainInfo, blvm_node::module::traits::ModuleError>
-    {
+    ) -> Result<blvm_node::module::traits::ChainInfo, blvm_node::module::traits::ModuleError> {
         Ok(blvm_node::module::traits::ChainInfo {
             tip_hash: [0u8; 32],
             height: self.block_height,
@@ -166,10 +159,7 @@ impl NodeAPI for MockNodeAPI {
     ) -> Result<(), blvm_node::module::traits::ModuleError> {
         Ok(())
     }
-    async fn delete_file(
-        &self,
-        _: String,
-    ) -> Result<(), blvm_node::module::traits::ModuleError> {
+    async fn delete_file(&self, _: String) -> Result<(), blvm_node::module::traits::ModuleError> {
         Ok(())
     }
     async fn list_directory(
@@ -238,10 +228,8 @@ impl NodeAPI for MockNodeAPI {
         &self,
         _: u64,
         _: Arc<dyn blvm_node::module::timers::manager::TimerCallback>,
-    ) -> Result<
-        blvm_node::module::timers::manager::TimerId,
-        blvm_node::module::traits::ModuleError,
-    > {
+    ) -> Result<blvm_node::module::timers::manager::TimerId, blvm_node::module::traits::ModuleError>
+    {
         Ok(0)
     }
     async fn cancel_timer(
@@ -254,10 +242,8 @@ impl NodeAPI for MockNodeAPI {
         &self,
         _: u64,
         _: Arc<dyn blvm_node::module::timers::manager::TaskCallback>,
-    ) -> Result<
-        blvm_node::module::timers::manager::TaskId,
-        blvm_node::module::traits::ModuleError,
-    > {
+    ) -> Result<blvm_node::module::timers::manager::TaskId, blvm_node::module::traits::ModuleError>
+    {
         Ok(0)
     }
     async fn report_metric(
@@ -285,19 +271,15 @@ impl NodeAPI for MockNodeAPI {
     }
     async fn discover_modules(
         &self,
-    ) -> Result<
-        Vec<blvm_node::module::traits::ModuleInfo>,
-        blvm_node::module::traits::ModuleError,
-    > {
+    ) -> Result<Vec<blvm_node::module::traits::ModuleInfo>, blvm_node::module::traits::ModuleError>
+    {
         Ok(Vec::new())
     }
     async fn get_module_info(
         &self,
         _: &str,
-    ) -> Result<
-        Option<blvm_node::module::traits::ModuleInfo>,
-        blvm_node::module::traits::ModuleError,
-    > {
+    ) -> Result<Option<blvm_node::module::traits::ModuleInfo>, blvm_node::module::traits::ModuleError>
+    {
         Ok(None)
     }
     async fn is_module_available(
@@ -327,9 +309,7 @@ impl NodeAPI for MockNodeAPI {
     ) -> Result<(), blvm_node::module::traits::ModuleError> {
         Ok(())
     }
-    async fn unregister_module_api(
-        &self,
-    ) -> Result<(), blvm_node::module::traits::ModuleError> {
+    async fn unregister_module_api(&self) -> Result<(), blvm_node::module::traits::ModuleError> {
         Ok(())
     }
     async fn get_module_health(
@@ -390,10 +370,8 @@ impl NodeAPI for MockNodeAPI {
     async fn submit_block(
         &self,
         _: blvm_protocol::Block,
-    ) -> Result<
-        blvm_node::module::traits::SubmitBlockResult,
-        blvm_node::module::traits::ModuleError,
-    > {
+    ) -> Result<blvm_node::module::traits::SubmitBlockResult, blvm_node::module::traits::ModuleError>
+    {
         Err(blvm_node::module::traits::ModuleError::Other(
             "not implemented".into(),
         ))
@@ -418,7 +396,9 @@ impl NodeAPI for MockNodeAPI {
         })
     }
 
-    async fn clear_block_serve_denylist(&self) -> Result<(), blvm_node::module::traits::ModuleError> {
+    async fn clear_block_serve_denylist(
+        &self,
+    ) -> Result<(), blvm_node::module::traits::ModuleError> {
         Ok(())
     }
 

@@ -2,8 +2,8 @@
 
 pub mod api;
 pub mod config;
-pub mod module;
 pub mod error;
+pub mod module;
 pub mod proposals;
 pub mod storage;
 pub mod webhook;
