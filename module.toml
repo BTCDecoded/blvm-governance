@@ -13,7 +13,3 @@ capabilities = [
 webhook_url = "Optional governance webhook URL for proposal notifications"
 
 # Written by release CI — do not edit by hand.
-[downloads]
-x86_64-linux  = { url = "https://github.com/BTCDecoded/blvm-governance/releases/download/v0.1.2/blvm-governance-x86_64-linux", sha256 = "58d5984beb0cf4d2bcbbbf97fba2614c7782b729b95a9ea8faafda6e125a99b4" }
-aarch64-linux = { url = "https://github.com/BTCDecoded/blvm-governance/releases/download/v0.1.2/blvm-governance-aarch64-linux", sha256 = "c36336c00b575926dd97c7b2a8ddff386657b09ca54bc58e0e8c5381312ef5a0" }
-x86_64-windows= { url = "https://github.com/BTCDecoded/blvm-governance/releases/download/v0.1.2/blvm-governance-x86_64-windows.exe", sha256 = "0580d4efaa5a0724c9556dbd0aa9403c0f56488d97640c69080956dd5e12e355" }

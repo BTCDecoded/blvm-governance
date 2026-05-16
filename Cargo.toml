@@ -15,8 +15,8 @@ name = "blvm-governance"
 path = "src/main.rs"
 
 [dependencies]
-# blvm-node for module system integration
-blvm-node = ">=0.1, <1"
+# blvm-node for module system integration (sled: ModuleDb / open_module_db; crates.io sdk 0.1.5 gap)
+blvm-node = { version = ">=0.1, <1", features = ["sled"] }
 # Protocol layer for transaction/block types
 blvm-protocol = ">=0.1, <1"
 
