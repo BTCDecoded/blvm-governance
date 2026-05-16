@@ -1,6 +1,6 @@
 [package]
 name = "blvm-governance"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Bitcoin Commons Team"]
 description = "Governance webhook and economic node tracking module for blvm-node"
@@ -61,5 +61,3 @@ blvm-sdk-macros = ">=0.1, <1"
 
 # Local monorepo: sibling paths override the version pins above.
 # Strip this section in CI/release (BTCDecoded/rust-ci/strip-patch-crates-io@main).
-[patch.crates-io]
-blvm-node = { path = "../blvm-node" }

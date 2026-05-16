@@ -1,5 +1,5 @@
 name = "blvm-governance"
-version = "0.1.1"
+version = "0.1.2"
 description = "Governance webhook and economic node tracking module for blvm-node"
 author = "Bitcoin Commons Team"
 entry_point = "blvm-governance"
@@ -14,6 +14,6 @@ webhook_url = "Optional governance webhook URL for proposal notifications"
 
 # Written by release CI — do not edit by hand.
 [downloads]
-x86_64-linux  = { url = "https://github.com/BTCDecoded/blvm-governance/releases/download/v0.1.1/blvm-governance-x86_64-linux", sha256 = "d0b929b103cb72ddf7865247a66831bd771ab8df2b54552e62abf9685ad6f31f" }
-aarch64-linux = { url = "https://github.com/BTCDecoded/blvm-governance/releases/download/v0.1.1/blvm-governance-aarch64-linux", sha256 = "cfc3f324ee75b298a838e22d2a75c792181a82da29170d16e75761d521062d65" }
-x86_64-windows= { url = "https://github.com/BTCDecoded/blvm-governance/releases/download/v0.1.1/blvm-governance-x86_64-windows.exe", sha256 = "9bd68e6b996bc1c8dbc373eeff6a4c7a28f611e694e97b3910573143f23ddfe3" }
+x86_64-linux  = { url = "https://github.com/BTCDecoded/blvm-governance/releases/download/v0.1.2/blvm-governance-x86_64-linux", sha256 = "58d5984beb0cf4d2bcbbbf97fba2614c7782b729b95a9ea8faafda6e125a99b4" }
+aarch64-linux = { url = "https://github.com/BTCDecoded/blvm-governance/releases/download/v0.1.2/blvm-governance-aarch64-linux", sha256 = "c36336c00b575926dd97c7b2a8ddff386657b09ca54bc58e0e8c5381312ef5a0" }
+x86_64-windows= { url = "https://github.com/BTCDecoded/blvm-governance/releases/download/v0.1.2/blvm-governance-x86_64-windows.exe", sha256 = "0580d4efaa5a0724c9556dbd0aa9403c0f56488d97640c69080956dd5e12e355" }

@@ -267,7 +267,7 @@ dependencies = [
 
 [[package]]
 name = "blvm-governance"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -304,6 +304,8 @@ dependencies = [
 [[package]]
 name = "blvm-node"
 version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "752ebc89c777d6ab0ed3e4acd396e7e85cc99d27fc6f7ce08a54c84e5ab82c90"
 dependencies = [
  "aes-gcm",
  "anyhow",
