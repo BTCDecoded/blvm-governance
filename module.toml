@@ -1,5 +1,5 @@
 name = "blvm-governance"
-version = "0.1.2"
+version = "0.1.3"
 description = "Governance webhook and economic node tracking module for blvm-node"
 author = "Bitcoin Commons Team"
 entry_point = "blvm-governance"
