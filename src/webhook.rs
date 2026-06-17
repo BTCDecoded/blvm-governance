@@ -1,10 +1,10 @@
 //! Governance webhook client
 
 use crate::error::GovernanceError;
+use blvm_node::module::EventType;
 use blvm_node::module::ipc::protocol::EventPayload;
 use blvm_node::module::ipc::protocol::ModuleMessage;
 use blvm_node::module::traits::NodeAPI;
-use blvm_node::module::EventType;
 use reqwest::Client;
 use tracing::{debug, info, warn};
 

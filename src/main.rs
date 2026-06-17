@@ -6,7 +6,7 @@
 use anyhow::Result;
 use blvm_governance::storage::up_v1;
 use blvm_governance::{
-    api::GovernanceModuleApi, proposals, webhook, GovernanceConfig, GovernanceModule,
+    GovernanceConfig, GovernanceModule, api::GovernanceModuleApi, proposals, webhook,
 };
 use blvm_sdk::migrations;
 use blvm_sdk::module::{ModuleBootstrap, ModuleDb};

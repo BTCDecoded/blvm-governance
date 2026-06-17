@@ -2,8 +2,8 @@
 //!
 //! Stores proposals when receiving GovernanceProposal* events so list-proposals can display them.
 
-use blvm_node::module::ipc::protocol::{EventPayload, ModuleMessage};
 use blvm_node::module::EventType;
+use blvm_node::module::ipc::protocol::{EventPayload, ModuleMessage};
 use serde::{Deserialize, Serialize};
 
 const PROPOSALS_TREE: &str = "proposals";
