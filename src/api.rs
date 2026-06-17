@@ -39,10 +39,10 @@ impl ModuleAPI for GovernanceModuleApi {
         match method {
             "get_proposals" => {
                 let proposals = self.proposal_store.load_proposals().map_err(|e| {
-                    ModuleError::OperationError(format!("Failed to load proposals: {}", e))
+                    ModuleError::OperationError(format!("Failed to load proposals: {e}"))
                 })?;
                 serde_json::to_vec(&proposals)
-                    .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
+                    .map_err(|e| ModuleError::OperationError(format!("Serialization error: {e}")))
             }
             "get_webhook_status" => {
                 let status = serde_json::json!({
@@ -50,7 +50,7 @@ impl ModuleAPI for GovernanceModuleApi {
                     "url": self.webhook_url.as_deref(),
                 });
                 serde_json::to_vec(&status)
-                    .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
+                    .map_err(|e| ModuleError::OperationError(format!("Serialization error: {e}")))
             }
             "create_proposal" => {
                 let params_json: serde_json::Value =
@@ -88,7 +88,7 @@ impl ModuleAPI for GovernanceModuleApi {
                     .publish_event(EventType::GovernanceProposalCreated, payload)
                     .await
                     .map_err(|e| {
-                        ModuleError::OperationError(format!("Failed to publish proposal: {}", e))
+                        ModuleError::OperationError(format!("Failed to publish proposal: {e}"))
                     })?;
                 serde_json::to_vec(&serde_json::json!({
                     "ok": true,
@@ -97,7 +97,7 @@ impl ModuleAPI for GovernanceModuleApi {
                     "pr_number": pr_number,
                     "tier": tier
                 }))
-                .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
+                .map_err(|e| ModuleError::OperationError(format!("Serialization error: {e}")))
             }
             "record_proposal_vote" => {
                 let params_json: serde_json::Value =
@@ -130,10 +130,7 @@ impl ModuleAPI for GovernanceModuleApi {
                     .publish_event(EventType::GovernanceProposalVoted, payload)
                     .await
                     .map_err(|e| {
-                        ModuleError::OperationError(format!(
-                            "Failed to publish proposal vote: {}",
-                            e
-                        ))
+                        ModuleError::OperationError(format!("Failed to publish proposal vote: {e}"))
                     })?;
                 serde_json::to_vec(&serde_json::json!({
                     "ok": true,
@@ -141,7 +138,7 @@ impl ModuleAPI for GovernanceModuleApi {
                     "voter": voter,
                     "vote": vote
                 }))
-                .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
+                .map_err(|e| ModuleError::OperationError(format!("Serialization error: {e}")))
             }
             "record_proposal_merged" => {
                 let params_json: serde_json::Value =
@@ -174,8 +171,7 @@ impl ModuleAPI for GovernanceModuleApi {
                     .await
                     .map_err(|e| {
                         ModuleError::OperationError(format!(
-                            "Failed to publish proposal merged: {}",
-                            e
+                            "Failed to publish proposal merged: {e}"
                         ))
                     })?;
                 serde_json::to_vec(&serde_json::json!({
@@ -184,11 +180,10 @@ impl ModuleAPI for GovernanceModuleApi {
                     "repository": repository,
                     "pr_number": pr_number
                 }))
-                .map_err(|e| ModuleError::OperationError(format!("Serialization error: {}", e)))
+                .map_err(|e| ModuleError::OperationError(format!("Serialization error: {e}")))
             }
             _ => Err(ModuleError::OperationError(format!(
-                "Unknown method: {}",
-                method
+                "Unknown method: {method}"
             ))),
         }
     }

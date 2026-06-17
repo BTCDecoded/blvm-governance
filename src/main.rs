@@ -33,8 +33,7 @@ async fn main() -> Result<()> {
                     .await
                     .map_err(|e| {
                         blvm_node::module::traits::ModuleError::Other(format!(
-                            "Failed to create webhook client: {}",
-                            e
+                            "Failed to create webhook client: {e}"
                         ))
                     })?;
             let proposal_store = Arc::new(proposals::ProposalStore::new(Arc::clone(&db)));

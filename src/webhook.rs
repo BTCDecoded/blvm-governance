@@ -44,7 +44,7 @@ impl GovernanceWebhookClient {
             .timeout(std::time::Duration::from_secs(10))
             .build()
             .map_err(|e| {
-                GovernanceError::WebhookError(format!("Failed to create HTTP client: {}", e))
+                GovernanceError::WebhookError(format!("Failed to create HTTP client: {e}"))
             })?;
 
         if enabled {
@@ -265,7 +265,7 @@ impl GovernanceWebhookClient {
 
         // Serialize block to JSON
         let block_json = serde_json::to_value(block).map_err(|e| {
-            GovernanceError::WebhookError(format!("Failed to serialize block: {}", e))
+            GovernanceError::WebhookError(format!("Failed to serialize block: {e}"))
         })?;
 
         // Prepare payload

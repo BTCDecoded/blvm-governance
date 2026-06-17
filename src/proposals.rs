@@ -117,15 +117,12 @@ impl ProposalStore {
         let tree = self
             .db
             .open_tree(PROPOSALS_TREE)
-            .map_err(|e| crate::error::GovernanceError::Storage(format!("open_tree: {}", e)))?;
+            .map_err(|e| crate::error::GovernanceError::Storage(format!("open_tree: {e}")))?;
         match tree.get(STORAGE_KEY) {
             Ok(Some(data)) => bincode::deserialize(&data)
-                .map_err(|e| crate::error::GovernanceError::Storage(format!("deserialize: {}", e))),
+                .map_err(|e| crate::error::GovernanceError::Storage(format!("deserialize: {e}"))),
             Ok(None) => Ok(HashMap::new()),
-            Err(e) => Err(crate::error::GovernanceError::Storage(format!(
-                "get: {}",
-                e
-            ))),
+            Err(e) => Err(crate::error::GovernanceError::Storage(format!("get: {e}"))),
         }
     }
 
@@ -136,11 +133,11 @@ impl ProposalStore {
         let tree = self
             .db
             .open_tree(PROPOSALS_TREE)
-            .map_err(|e| crate::error::GovernanceError::Storage(format!("open_tree: {}", e)))?;
+            .map_err(|e| crate::error::GovernanceError::Storage(format!("open_tree: {e}")))?;
         let data = bincode::serialize(proposals)
-            .map_err(|e| crate::error::GovernanceError::Storage(format!("serialize: {}", e)))?;
+            .map_err(|e| crate::error::GovernanceError::Storage(format!("serialize: {e}")))?;
         tree.insert(STORAGE_KEY, &data)
-            .map_err(|e| crate::error::GovernanceError::Storage(format!("insert: {}", e)))?;
+            .map_err(|e| crate::error::GovernanceError::Storage(format!("insert: {e}")))?;
         Ok(())
     }
 
@@ -150,20 +147,17 @@ impl ProposalStore {
     ) -> Result<Vec<GovernanceProposal>, crate::error::GovernanceError> {
         let tree = db
             .open_tree(PROPOSALS_TREE)
-            .map_err(|e| crate::error::GovernanceError::Storage(format!("open_tree: {}", e)))?;
+            .map_err(|e| crate::error::GovernanceError::Storage(format!("open_tree: {e}")))?;
         match tree.get(STORAGE_KEY) {
             Ok(Some(data)) => {
                 let map: HashMap<String, GovernanceProposal> = bincode::deserialize(&data)
                     .map_err(|e| {
-                        crate::error::GovernanceError::Storage(format!("deserialize: {}", e))
+                        crate::error::GovernanceError::Storage(format!("deserialize: {e}"))
                     })?;
                 Ok(map.into_values().collect())
             }
             Ok(None) => Ok(Vec::new()),
-            Err(e) => Err(crate::error::GovernanceError::Storage(format!(
-                "get: {}",
-                e
-            ))),
+            Err(e) => Err(crate::error::GovernanceError::Storage(format!("get: {e}"))),
         }
     }
 }

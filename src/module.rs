@@ -102,7 +102,7 @@ impl GovernanceModule {
                 Ok(format!("Webhook test OK: {} {}", r.status(), url))
             }
             Ok(r) => Ok(format!("Webhook returned {}: {}", r.status(), url)),
-            Err(e) => Ok(format!("Webhook test failed: {} - {}", url, e)),
+            Err(e) => Ok(format!("Webhook test failed: {url} - {e}")),
         }
     }
 
