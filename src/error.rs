@@ -15,6 +15,9 @@ pub enum GovernanceError {
 
     #[error("Storage error: {0}")]
     Storage(String),
+
+    #[error("{0}")]
+    Proposal(String),
 }
 
 impl From<GovernanceError> for blvm_node::module::traits::ModuleError {

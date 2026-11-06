@@ -63,17 +63,13 @@ impl ProposalStore {
                     tier,
                 } = &event_msg.payload
                 {
-                    proposals.insert(
+                    apply_created(
+                        &mut proposals,
                         proposal_id.clone(),
-                        GovernanceProposal {
-                            proposal_id: proposal_id.clone(),
-                            repository: repository.clone(),
-                            pr_number: *pr_number,
-                            tier: tier.clone(),
-                            status: ProposalStatus::Created,
-                            votes: Vec::new(),
-                        },
-                    );
+                        repository.clone(),
+                        *pr_number,
+                        tier.clone(),
+                    )?;
                     self.save(&proposals)?;
                 }
             }
@@ -84,13 +80,8 @@ impl ProposalStore {
                     vote,
                 } = &event_msg.payload
                 {
-                    if let Some(p) = proposals.get_mut(proposal_id) {
-                        p.votes.push(ProposalVote {
-                            voter: voter.clone(),
-                            vote: vote.clone(),
-                        });
-                        self.save(&proposals)?;
-                    }
+                    apply_voted(&mut proposals, proposal_id, voter.clone(), vote.clone())?;
+                    self.save(&proposals)?;
                 }
             }
             EventType::GovernanceProposalMerged => {
@@ -100,12 +91,13 @@ impl ProposalStore {
                     pr_number,
                 } = &event_msg.payload
                 {
-                    if let Some(p) = proposals.get_mut(proposal_id) {
-                        p.status = ProposalStatus::Merged;
-                        p.repository = repository.clone();
-                        p.pr_number = *pr_number;
-                        self.save(&proposals)?;
-                    }
+                    apply_merged(
+                        &mut proposals,
+                        proposal_id,
+                        repository.clone(),
+                        *pr_number,
+                    )?;
+                    self.save(&proposals)?;
                 }
             }
             _ => {}
@@ -159,5 +151,122 @@ impl ProposalStore {
             Ok(None) => Ok(Vec::new()),
             Err(e) => Err(crate::error::GovernanceError::Storage(format!("get: {e}"))),
         }
+    }
+}
+
+fn apply_created(
+    proposals: &mut HashMap<String, GovernanceProposal>,
+    proposal_id: String,
+    repository: String,
+    pr_number: u64,
+    tier: String,
+) -> Result<(), crate::error::GovernanceError> {
+    if proposals.contains_key(&proposal_id) {
+        return Err(crate::error::GovernanceError::Proposal(format!(
+            "proposal {proposal_id} already exists"
+        )));
+    }
+    proposals.insert(
+        proposal_id.clone(),
+        GovernanceProposal {
+            proposal_id,
+            repository,
+            pr_number,
+            tier,
+            status: ProposalStatus::Created,
+            votes: Vec::new(),
+        },
+    );
+    Ok(())
+}
+
+fn apply_voted(
+    proposals: &mut HashMap<String, GovernanceProposal>,
+    proposal_id: &str,
+    voter: String,
+    vote: String,
+) -> Result<(), crate::error::GovernanceError> {
+    let Some(p) = proposals.get_mut(proposal_id) else {
+        return Err(crate::error::GovernanceError::Proposal(format!(
+            "unknown proposal {proposal_id}"
+        )));
+    };
+    p.votes.push(ProposalVote { voter, vote });
+    Ok(())
+}
+
+fn apply_merged(
+    proposals: &mut HashMap<String, GovernanceProposal>,
+    proposal_id: &str,
+    repository: String,
+    pr_number: u64,
+) -> Result<(), crate::error::GovernanceError> {
+    let Some(p) = proposals.get_mut(proposal_id) else {
+        return Err(crate::error::GovernanceError::Proposal(format!(
+            "unknown proposal {proposal_id}"
+        )));
+    };
+    p.status = ProposalStatus::Merged;
+    p.repository = repository;
+    p.pr_number = pr_number;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn created(id: &str) -> GovernanceProposal {
+        GovernanceProposal {
+            proposal_id: id.to_string(),
+            repository: "org/repo".to_string(),
+            pr_number: 1,
+            tier: "t".to_string(),
+            status: ProposalStatus::Created,
+            votes: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn second_create_keeps_votes_and_status() {
+        let mut proposals = HashMap::new();
+        apply_created(
+            &mut proposals,
+            "p1".to_string(),
+            "org/repo".to_string(),
+            1,
+            "t".to_string(),
+        )
+        .unwrap();
+        apply_voted(&mut proposals, "p1", "alice".to_string(), "approve".to_string()).unwrap();
+        proposals.get_mut("p1").unwrap().status = ProposalStatus::Merged;
+        let err = apply_created(
+            &mut proposals,
+            "p1".to_string(),
+            "org/repo".to_string(),
+            1,
+            "t".to_string(),
+        )
+        .unwrap_err();
+        let stored = proposals.get("p1").unwrap();
+        assert!(matches!(stored.status, ProposalStatus::Merged));
+        assert_eq!(stored.votes.len(), 1);
+        assert!(err.to_string().contains("already exists"));
+    }
+
+    #[test]
+    fn vote_for_unknown_proposal_is_an_error() {
+        let mut proposals = HashMap::new();
+        proposals.insert("p1".to_string(), created("p1"));
+        let err = apply_voted(
+            &mut proposals,
+            "missing",
+            "alice".to_string(),
+            "approve".to_string(),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("unknown proposal"));
+        assert!(proposals.get("missing").is_none());
+        assert!(proposals.get("p1").unwrap().votes.is_empty());
     }
 }
