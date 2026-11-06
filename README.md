@@ -1,13 +1,11 @@
 # blvm-governance
 
-Governance webhook and economic node tracking module for blvm-node.
+Governance webhook and proposal module for blvm-node.
 
 ## Overview
 
 This module provides governance integration for blvm-node, including:
 - Webhook notifications to blvm-commons
-- Economic node tracking
-- Veto system integration
 - Governance proposal monitoring
 
 ## Installation
@@ -39,7 +37,7 @@ The module includes a `module.toml` manifest:
 ```toml
 name = "blvm-governance"
 version = "0.1"
-description = "Governance webhook and economic node tracking module"
+description = "Governance webhook and proposal module"
 author = "Bitcoin Commons Team"
 entry_point = "blvm-governance"
 
@@ -55,15 +53,11 @@ capabilities = [
 - `GovernanceProposalCreated` - New governance proposal
 - `GovernanceProposalVoted` - Vote cast on proposal
 - `GovernanceProposalMerged` - Proposal merged
-- `EconomicNodeRegistered` - Economic node registered
-- `EconomicNodeVeto` - Economic node veto signal
-- `ChainTipUpdated` - For tracking block height
+- `NewBlock` - Block notification
 
 ### Published Events
 - `WebhookSent` - Webhook notification sent
 - `WebhookFailed` - Webhook delivery failed
-- `VetoThresholdReached` - Veto threshold reached
-- `GovernanceForkDetected` - Governance fork detected
 
 ## License
 
