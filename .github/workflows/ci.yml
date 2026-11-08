@@ -94,6 +94,9 @@ jobs:
       - name: clippy
         run: cargo clippy --all-targets -- -D warnings
 
+      - name: Setup blvm-spec
+        uses: BTCDecoded/rust-ci/setup-blvm-spec@main
+
       - name: test
         run: cargo test --all-targets
 
