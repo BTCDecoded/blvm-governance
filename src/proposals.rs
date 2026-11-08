@@ -55,44 +55,49 @@ impl ProposalStore {
         };
         let mut proposals = self.load()?;
         match event_msg.event_type {
-            EventType::GovernanceProposalCreated => {
-                if let EventPayload::GovernanceProposalCreated {
-                    proposal_id,
-                    repository,
-                    pr_number,
-                    tier,
-                } = &event_msg.payload
-                {
-                    apply_created(
-                        &mut proposals,
-                        proposal_id.clone(),
-                        repository.clone(),
-                        *pr_number,
-                        tier.clone(),
-                    )?;
-                    self.save(&proposals)?;
-                }
-            }
-            EventType::GovernanceProposalVoted => {
-                if let EventPayload::GovernanceProposalVoted {
-                    proposal_id,
-                    voter,
-                    vote,
-                } = &event_msg.payload
-                {
-                    apply_voted(&mut proposals, proposal_id, voter.clone(), vote.clone())?;
-                    self.save(&proposals)?;
-                }
-            }
-            EventType::GovernanceProposalMerged => {
-                if let EventPayload::GovernanceProposalMerged {
-                    proposal_id,
-                    repository,
-                    pr_number,
-                } = &event_msg.payload
-                {
-                    apply_merged(&mut proposals, proposal_id, repository.clone(), *pr_number)?;
-                    self.save(&proposals)?;
+            EventType::ModuleEvent => {
+                if let EventPayload::ModuleEvent { name, data, .. } = &event_msg.payload {
+                    let value: serde_json::Value =
+                        serde_json::from_slice(data).unwrap_or(serde_json::Value::Null);
+                    match name.as_str() {
+                        "GovernanceProposalCreated" => {
+                            apply_created(
+                                &mut proposals,
+                                json_string(&value, "proposal_id"),
+                                json_string(&value, "repository"),
+                                value
+                                    .get("pr_number")
+                                    .and_then(|item| item.as_u64())
+                                    .unwrap_or(0),
+                                json_string(&value, "tier"),
+                            )?;
+                            self.save(&proposals)?;
+                        }
+                        "GovernanceProposalVoted" => {
+                            let proposal_id = json_string(&value, "proposal_id");
+                            apply_voted(
+                                &mut proposals,
+                                &proposal_id,
+                                json_string(&value, "voter"),
+                                json_string(&value, "vote"),
+                            )?;
+                            self.save(&proposals)?;
+                        }
+                        "GovernanceProposalMerged" => {
+                            let proposal_id = json_string(&value, "proposal_id");
+                            apply_merged(
+                                &mut proposals,
+                                &proposal_id,
+                                json_string(&value, "repository"),
+                                value
+                                    .get("pr_number")
+                                    .and_then(|item| item.as_u64())
+                                    .unwrap_or(0),
+                            )?;
+                            self.save(&proposals)?;
+                        }
+                        _ => {}
+                    }
                 }
             }
             _ => {}
@@ -147,6 +152,14 @@ impl ProposalStore {
             Err(e) => Err(crate::error::GovernanceError::Storage(format!("get: {e}"))),
         }
     }
+}
+
+fn json_string(value: &serde_json::Value, key: &str) -> String {
+    value
+        .get(key)
+        .and_then(|item| item.as_str())
+        .unwrap_or("")
+        .to_string()
 }
 
 fn apply_created(

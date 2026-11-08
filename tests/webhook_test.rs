@@ -23,13 +23,12 @@ async fn test_webhook_client_disabled() {
     assert!(!client.is_enabled());
 
     let event = ModuleMessage::Event(EventMessage {
-        event_type: EventType::GovernanceProposalCreated,
-        payload: EventPayload::GovernanceProposalCreated {
-            proposal_id: "test".to_string(),
-            repository: "test/repo".to_string(),
-            pr_number: 1,
-            tier: "standard".to_string(),
-        },
+        event_type: EventType::ModuleEvent,
+        payload: EventPayload::module_event(
+            "GovernanceProposalCreated",
+            br#"{"proposal_id":"test","repository":"test/repo","pr_number":1,"tier":"standard"}"#
+                .to_vec(),
+        ),
     });
 
     let node_api = Arc::new(common::MockNodeAPI { block_height: 100 });

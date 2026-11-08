@@ -78,14 +78,17 @@ impl ModuleAPI for GovernanceModuleApi {
                     .and_then(|v| v.as_str())
                     .unwrap_or("standard")
                     .to_string();
-                let payload = EventPayload::GovernanceProposalCreated {
-                    proposal_id: proposal_id.clone(),
-                    repository: repository.clone(),
-                    pr_number,
-                    tier: tier.clone(),
-                };
+                let payload = EventPayload::module_event_json(
+                    "GovernanceProposalCreated",
+                    &serde_json::json!({
+                        "proposal_id": proposal_id.clone(),
+                        "repository": repository.clone(),
+                        "pr_number": pr_number,
+                        "tier": tier.clone(),
+                    }),
+                );
                 self.node_api
-                    .publish_event(EventType::GovernanceProposalCreated, payload)
+                    .publish_event(EventType::ModuleEvent, payload)
                     .await
                     .map_err(|e| {
                         ModuleError::OperationError(format!("Failed to publish proposal: {e}"))
@@ -121,13 +124,16 @@ impl ModuleAPI for GovernanceModuleApi {
                     .and_then(|v| v.as_str())
                     .unwrap_or("abstain")
                     .to_string();
-                let payload = EventPayload::GovernanceProposalVoted {
-                    proposal_id: proposal_id.clone(),
-                    voter: voter.clone(),
-                    vote: vote.clone(),
-                };
+                let payload = EventPayload::module_event_json(
+                    "GovernanceProposalVoted",
+                    &serde_json::json!({
+                        "proposal_id": proposal_id.clone(),
+                        "voter": voter.clone(),
+                        "vote": vote.clone(),
+                    }),
+                );
                 self.node_api
-                    .publish_event(EventType::GovernanceProposalVoted, payload)
+                    .publish_event(EventType::ModuleEvent, payload)
                     .await
                     .map_err(|e| {
                         ModuleError::OperationError(format!("Failed to publish proposal vote: {e}"))
@@ -161,13 +167,16 @@ impl ModuleAPI for GovernanceModuleApi {
                     .get("pr_number")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0);
-                let payload = EventPayload::GovernanceProposalMerged {
-                    proposal_id: proposal_id.clone(),
-                    repository: repository.clone(),
-                    pr_number,
-                };
+                let payload = EventPayload::module_event_json(
+                    "GovernanceProposalMerged",
+                    &serde_json::json!({
+                        "proposal_id": proposal_id.clone(),
+                        "repository": repository.clone(),
+                        "pr_number": pr_number,
+                    }),
+                );
                 self.node_api
-                    .publish_event(EventType::GovernanceProposalMerged, payload)
+                    .publish_event(EventType::ModuleEvent, payload)
                     .await
                     .map_err(|e| {
                         ModuleError::OperationError(format!(

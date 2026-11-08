@@ -14,6 +14,16 @@ pub struct GovernanceWebhookClient {
     webhook_url: Option<String>,
     node_id: Option<String>,
     enabled: bool,
+    /// Absent posts once. `Some(n)` posts up to `n` times, stopping after a success.
+    webhook_retry_count: Option<u32>,
+}
+
+/// How many times `notify_governance_event` posts. An omitted count posts once.
+pub(crate) fn webhook_post_attempts(retry_count: Option<u32>) -> u32 {
+    match retry_count {
+        Some(count) if count > 0 => count,
+        _ => 1,
+    }
 }
 
 impl GovernanceWebhookClient {
@@ -38,6 +48,9 @@ impl GovernanceWebhookClient {
     ) -> Result<Self, GovernanceError> {
         let webhook_url = ctx.get_config("governance.webhook_url").cloned();
         let node_id = ctx.get_config("governance.node_id").cloned();
+        let webhook_retry_count = ctx
+            .get_config("governance.webhook_retry_count")
+            .and_then(|value| value.parse().ok());
         let enabled = webhook_url.is_some();
 
         let client = Client::builder()
@@ -60,6 +73,7 @@ impl GovernanceWebhookClient {
             webhook_url,
             node_id,
             enabled,
+            webhook_retry_count,
         })
     }
 
@@ -84,75 +98,20 @@ impl GovernanceWebhookClient {
                             }
                         }
                     }
-                    EventType::GovernanceProposalCreated => {
-                        if let EventPayload::GovernanceProposalCreated {
-                            proposal_id,
-                            repository,
-                            pr_number,
-                            tier,
-                        } = &event_msg.payload
-                        {
-                            info!(
-                                "Governance proposal created: id={}, repository={}, pr={}, tier={}",
-                                proposal_id, repository, pr_number, tier
-                            );
-                            self.notify_governance_event(
-                                "proposal_created",
-                                serde_json::json!({
-                                    "proposal_id": proposal_id,
-                                    "repository": repository,
-                                    "pr_number": pr_number,
-                                    "tier": tier,
-                                }),
-                                node_api,
-                            )
-                            .await?;
-                        }
-                    }
-                    EventType::GovernanceProposalVoted => {
-                        if let EventPayload::GovernanceProposalVoted {
-                            proposal_id,
-                            voter,
-                            vote,
-                        } = &event_msg.payload
-                        {
-                            info!(
-                                "Governance proposal voted: id={}, voter={}, vote={}",
-                                proposal_id, voter, vote
-                            );
-                            self.notify_governance_event(
-                                "proposal_voted",
-                                serde_json::json!({
-                                    "proposal_id": proposal_id,
-                                    "voter": voter,
-                                    "vote": vote,
-                                }),
-                                node_api,
-                            )
-                            .await?;
-                        }
-                    }
-                    EventType::GovernanceProposalMerged => {
-                        if let EventPayload::GovernanceProposalMerged {
-                            proposal_id,
-                            repository,
-                            pr_number,
-                        } = &event_msg.payload
-                        {
-                            info!(
-                                "Governance proposal merged: id={}, repository={}, pr={}",
-                                proposal_id, repository, pr_number
-                            );
-                            self.notify_governance_event(
-                                "proposal_merged",
-                                serde_json::json!({
-                                    "proposal_id": proposal_id,
-                                    "repository": repository,
-                                    "pr_number": pr_number,
-                                }),
-                                node_api,
-                            )
-                            .await?;
+                    EventType::ModuleEvent => {
+                        if let EventPayload::ModuleEvent { name, data, .. } = &event_msg.payload {
+                            let value: serde_json::Value =
+                                serde_json::from_slice(data).unwrap_or(serde_json::Value::Null);
+                            let kind = match name.as_str() {
+                                "GovernanceProposalCreated" => "proposal_created",
+                                "GovernanceProposalVoted" => "proposal_voted",
+                                "GovernanceProposalMerged" => "proposal_merged",
+                                _ => "",
+                            };
+                            if !kind.is_empty() {
+                                info!("Governance module event: {name}");
+                                self.notify_governance_event(kind, value, node_api).await?;
+                            }
                         }
                     }
                     _ => {
@@ -194,53 +153,56 @@ impl GovernanceWebhookClient {
                 .as_secs(),
         });
 
-        // Send webhook and publish WebhookSent/WebhookFailed
-        match self.client.post(url).json(&payload).send().await {
-            Ok(response) => {
-                if response.status().is_success() {
+        let attempts = webhook_post_attempts(self.webhook_retry_count);
+        let mut last_error = String::new();
+        for _ in 0..attempts {
+            match self.client.post(url).json(&payload).send().await {
+                Ok(response) if response.status().is_success() => {
                     debug!(
                         "Governance webhook sent successfully: event_type={}",
                         event_type
                     );
-                    let payload = EventPayload::WebhookSent {
-                        webhook_url: url.clone(),
-                        event_type: event_type.to_string(),
-                        success: true,
-                    };
+                    let payload = EventPayload::module_event_json(
+                        "WebhookSent",
+                        &serde_json::json!({
+                            "webhook_url": url,
+                            "event_type": event_type,
+                            "success": true,
+                        }),
+                    );
                     let _ = node_api
-                        .publish_event(EventType::WebhookSent, payload)
+                        .publish_event(EventType::ModuleEvent, payload)
                         .await;
-                } else {
+                    return Ok(());
+                }
+                Ok(response) => {
+                    last_error = format!("HTTP {}", response.status());
                     warn!(
                         "Governance webhook returned error status {} for event_type={}",
                         response.status(),
                         event_type
                     );
-                    let payload = EventPayload::WebhookFailed {
-                        webhook_url: url.clone(),
-                        event_type: event_type.to_string(),
-                        error: format!("HTTP {}", response.status()),
-                    };
-                    let _ = node_api
-                        .publish_event(EventType::WebhookFailed, payload)
-                        .await;
+                }
+                Err(e) => {
+                    last_error = e.to_string();
+                    warn!(
+                        "Failed to send governance webhook for event_type={}: {}",
+                        event_type, e
+                    );
                 }
             }
-            Err(e) => {
-                warn!(
-                    "Failed to send governance webhook for event_type={}: {}",
-                    event_type, e
-                );
-                let payload = EventPayload::WebhookFailed {
-                    webhook_url: url.clone(),
-                    event_type: event_type.to_string(),
-                    error: e.to_string(),
-                };
-                let _ = node_api
-                    .publish_event(EventType::WebhookFailed, payload)
-                    .await;
-            }
         }
+        let payload = EventPayload::module_event_json(
+            "WebhookFailed",
+            &serde_json::json!({
+                "webhook_url": url,
+                "event_type": event_type,
+                "error": last_error,
+            }),
+        );
+        let _ = node_api
+            .publish_event(EventType::ModuleEvent, payload)
+            .await;
 
         Ok(())
     }
@@ -287,13 +249,16 @@ impl GovernanceWebhookClient {
                         hex::encode(block_hash),
                         height
                     );
-                    let payload = EventPayload::WebhookSent {
-                        webhook_url: url.clone(),
-                        event_type: event_type.to_string(),
-                        success: true,
-                    };
+                    let payload = EventPayload::module_event_json(
+                        "WebhookSent",
+                        &serde_json::json!({
+                            "webhook_url": url,
+                            "event_type": event_type,
+                            "success": true,
+                        }),
+                    );
                     let _ = node_api
-                        .publish_event(EventType::WebhookSent, payload)
+                        .publish_event(EventType::ModuleEvent, payload)
                         .await;
                 } else {
                     warn!(
@@ -302,13 +267,16 @@ impl GovernanceWebhookClient {
                         hex::encode(block_hash),
                         height
                     );
-                    let payload = EventPayload::WebhookFailed {
-                        webhook_url: url.clone(),
-                        event_type: event_type.to_string(),
-                        error: format!("HTTP {}", response.status()),
-                    };
+                    let payload = EventPayload::module_event_json(
+                        "WebhookFailed",
+                        &serde_json::json!({
+                            "webhook_url": url,
+                            "event_type": event_type,
+                            "error": format!("HTTP {}", response.status()),
+                        }),
+                    );
                     let _ = node_api
-                        .publish_event(EventType::WebhookFailed, payload)
+                        .publish_event(EventType::ModuleEvent, payload)
                         .await;
                 }
             }
@@ -319,13 +287,16 @@ impl GovernanceWebhookClient {
                     height,
                     e
                 );
-                let payload = EventPayload::WebhookFailed {
-                    webhook_url: url.clone(),
-                    event_type: event_type.to_string(),
-                    error: e.to_string(),
-                };
+                let payload = EventPayload::module_event_json(
+                    "WebhookFailed",
+                    &serde_json::json!({
+                        "webhook_url": url,
+                        "event_type": event_type,
+                        "error": e.to_string(),
+                    }),
+                );
                 let _ = node_api
-                    .publish_event(EventType::WebhookFailed, payload)
+                    .publish_event(EventType::ModuleEvent, payload)
                     .await;
             }
         }
@@ -353,5 +324,16 @@ impl GovernanceWebhookClient {
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&second_hash);
         hash
+    }
+}
+
+#[cfg(test)]
+mod webhook_attempt_tests {
+    use super::webhook_post_attempts;
+
+    #[test]
+    fn omitted_retry_count_posts_once() {
+        assert_eq!(webhook_post_attempts(None), 1);
+        assert_eq!(webhook_post_attempts(Some(3)), 3);
     }
 }

@@ -18,12 +18,7 @@ pub struct GovernanceModule {
 
 #[module]
 impl GovernanceModule {
-    #[on_event(
-        GovernanceProposalCreated,
-        GovernanceProposalVoted,
-        GovernanceProposalMerged,
-        NewBlock
-    )]
+    #[on_event(ModuleEvent, NewBlock)]
     async fn on_governance_event(
         &self,
         event: &EventMessage,
