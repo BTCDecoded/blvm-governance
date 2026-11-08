@@ -91,12 +91,7 @@ impl ProposalStore {
                     pr_number,
                 } = &event_msg.payload
                 {
-                    apply_merged(
-                        &mut proposals,
-                        proposal_id,
-                        repository.clone(),
-                        *pr_number,
-                    )?;
+                    apply_merged(&mut proposals, proposal_id, repository.clone(), *pr_number)?;
                     self.save(&proposals)?;
                 }
             }
@@ -238,7 +233,13 @@ mod tests {
             "t".to_string(),
         )
         .unwrap();
-        apply_voted(&mut proposals, "p1", "alice".to_string(), "approve".to_string()).unwrap();
+        apply_voted(
+            &mut proposals,
+            "p1",
+            "alice".to_string(),
+            "approve".to_string(),
+        )
+        .unwrap();
         proposals.get_mut("p1").unwrap().status = ProposalStatus::Merged;
         let err = apply_created(
             &mut proposals,

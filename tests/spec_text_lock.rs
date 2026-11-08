@@ -20,7 +20,8 @@ fn read(path: &Path) -> String {
 }
 
 fn rust_sources(dir: &Path, hits: &mut Vec<PathBuf>) {
-    let entries = std::fs::read_dir(dir).unwrap_or_else(|err| panic!("read {}: {err}", dir.display()));
+    let entries =
+        std::fs::read_dir(dir).unwrap_or_else(|err| panic!("read {}: {err}", dir.display()));
     for entry in entries {
         let path = entry.unwrap().path();
         if path.is_dir() {
