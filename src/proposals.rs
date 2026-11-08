@@ -54,53 +54,50 @@ impl ProposalStore {
             return Ok(());
         };
         let mut proposals = self.load()?;
-        match event_msg.event_type {
-            EventType::ModuleEvent => {
-                if let EventPayload::ModuleEvent { name, data, .. } = &event_msg.payload {
-                    let value: serde_json::Value =
-                        serde_json::from_slice(data).unwrap_or(serde_json::Value::Null);
-                    match name.as_str() {
-                        "GovernanceProposalCreated" => {
-                            apply_created(
-                                &mut proposals,
-                                json_string(&value, "proposal_id"),
-                                json_string(&value, "repository"),
-                                value
-                                    .get("pr_number")
-                                    .and_then(|item| item.as_u64())
-                                    .unwrap_or(0),
-                                json_string(&value, "tier"),
-                            )?;
-                            self.save(&proposals)?;
-                        }
-                        "GovernanceProposalVoted" => {
-                            let proposal_id = json_string(&value, "proposal_id");
-                            apply_voted(
-                                &mut proposals,
-                                &proposal_id,
-                                json_string(&value, "voter"),
-                                json_string(&value, "vote"),
-                            )?;
-                            self.save(&proposals)?;
-                        }
-                        "GovernanceProposalMerged" => {
-                            let proposal_id = json_string(&value, "proposal_id");
-                            apply_merged(
-                                &mut proposals,
-                                &proposal_id,
-                                json_string(&value, "repository"),
-                                value
-                                    .get("pr_number")
-                                    .and_then(|item| item.as_u64())
-                                    .unwrap_or(0),
-                            )?;
-                            self.save(&proposals)?;
-                        }
-                        _ => {}
+        if event_msg.event_type == EventType::ModuleEvent {
+            if let EventPayload::ModuleEvent { name, data, .. } = &event_msg.payload {
+                let value: serde_json::Value =
+                    serde_json::from_slice(data).unwrap_or(serde_json::Value::Null);
+                match name.as_str() {
+                    "GovernanceProposalCreated" => {
+                        apply_created(
+                            &mut proposals,
+                            json_string(&value, "proposal_id"),
+                            json_string(&value, "repository"),
+                            value
+                                .get("pr_number")
+                                .and_then(|item| item.as_u64())
+                                .unwrap_or(0),
+                            json_string(&value, "tier"),
+                        )?;
+                        self.save(&proposals)?;
                     }
+                    "GovernanceProposalVoted" => {
+                        let proposal_id = json_string(&value, "proposal_id");
+                        apply_voted(
+                            &mut proposals,
+                            &proposal_id,
+                            json_string(&value, "voter"),
+                            json_string(&value, "vote"),
+                        )?;
+                        self.save(&proposals)?;
+                    }
+                    "GovernanceProposalMerged" => {
+                        let proposal_id = json_string(&value, "proposal_id");
+                        apply_merged(
+                            &mut proposals,
+                            &proposal_id,
+                            json_string(&value, "repository"),
+                            value
+                                .get("pr_number")
+                                .and_then(|item| item.as_u64())
+                                .unwrap_or(0),
+                        )?;
+                        self.save(&proposals)?;
+                    }
+                    _ => {}
                 }
             }
-            _ => {}
         }
         Ok(())
     }
@@ -280,7 +277,7 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.to_string().contains("unknown proposal"));
-        assert!(proposals.get("missing").is_none());
+        assert!(!proposals.contains_key("missing"));
         assert!(proposals.get("p1").unwrap().votes.is_empty());
     }
 }
