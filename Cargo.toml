@@ -1,6 +1,6 @@
 [package]
 name = "blvm-governance"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 authors = ["Bitcoin Commons Team"]
 description = "Governance webhook and economic node tracking module for blvm-node"
