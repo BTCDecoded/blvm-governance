@@ -1,9 +1,9 @@
-//! Governance proposal storage
+//! Governance proposal storage.
 //!
-//! Stores proposals when receiving GovernanceProposal* events so list-proposals can display them.
+//! The module API writes proposals. A `ModuleEvent` on the bus is not a vote,
+//! a create, or a merge: any loaded module can publish those names.
 
-use blvm_node::module::EventType;
-use blvm_node::module::ipc::protocol::{EventPayload, ModuleMessage};
+use blvm_node::module::ipc::protocol::ModuleMessage;
 use serde::{Deserialize, Serialize};
 
 const PROPOSALS_TREE: &str = "proposals";
@@ -49,56 +49,50 @@ impl ProposalStore {
         Self::load_for_display(&self.db)
     }
 
-    pub fn handle_event(&self, event: &ModuleMessage) -> Result<(), crate::error::GovernanceError> {
-        let ModuleMessage::Event(event_msg) = event else {
-            return Ok(());
-        };
+    pub fn create_proposal(
+        &self,
+        proposal_id: String,
+        repository: String,
+        pr_number: u64,
+        tier: String,
+    ) -> Result<(), crate::error::GovernanceError> {
         let mut proposals = self.load()?;
-        if event_msg.event_type == EventType::ModuleEvent {
-            if let EventPayload::ModuleEvent { name, data, .. } = &event_msg.payload {
-                let value: serde_json::Value =
-                    serde_json::from_slice(data).unwrap_or(serde_json::Value::Null);
-                match name.as_str() {
-                    "GovernanceProposalCreated" => {
-                        apply_created(
-                            &mut proposals,
-                            json_string(&value, "proposal_id"),
-                            json_string(&value, "repository"),
-                            value
-                                .get("pr_number")
-                                .and_then(|item| item.as_u64())
-                                .unwrap_or(0),
-                            json_string(&value, "tier"),
-                        )?;
-                        self.save(&proposals)?;
-                    }
-                    "GovernanceProposalVoted" => {
-                        let proposal_id = json_string(&value, "proposal_id");
-                        apply_voted(
-                            &mut proposals,
-                            &proposal_id,
-                            json_string(&value, "voter"),
-                            json_string(&value, "vote"),
-                        )?;
-                        self.save(&proposals)?;
-                    }
-                    "GovernanceProposalMerged" => {
-                        let proposal_id = json_string(&value, "proposal_id");
-                        apply_merged(
-                            &mut proposals,
-                            &proposal_id,
-                            json_string(&value, "repository"),
-                            value
-                                .get("pr_number")
-                                .and_then(|item| item.as_u64())
-                                .unwrap_or(0),
-                        )?;
-                        self.save(&proposals)?;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        apply_created(&mut proposals, proposal_id, repository, pr_number, tier)?;
+        self.save(&proposals)
+    }
+
+    pub fn record_vote(
+        &self,
+        proposal_id: &str,
+        voter: &str,
+        vote: &str,
+    ) -> Result<(), crate::error::GovernanceError> {
+        let mut proposals = self.load()?;
+        apply_voted(
+            &mut proposals,
+            proposal_id,
+            voter.to_string(),
+            vote.to_string(),
+        )?;
+        self.save(&proposals)
+    }
+
+    pub fn record_merged(
+        &self,
+        proposal_id: &str,
+        repository: String,
+        pr_number: u64,
+    ) -> Result<(), crate::error::GovernanceError> {
+        let mut proposals = self.load()?;
+        apply_merged(&mut proposals, proposal_id, repository, pr_number)?;
+        self.save(&proposals)
+    }
+
+    /// The bus is not a write path. Kept so event delivery still has a handler.
+    pub fn handle_event(
+        &self,
+        _event: &ModuleMessage,
+    ) -> Result<(), crate::error::GovernanceError> {
         Ok(())
     }
 
@@ -151,12 +145,24 @@ impl ProposalStore {
     }
 }
 
-fn json_string(value: &serde_json::Value, key: &str) -> String {
-    value
-        .get(key)
-        .and_then(|item| item.as_str())
-        .unwrap_or("")
-        .to_string()
+/// The voter is the calling module. A body may repeat that id. It may not name another one.
+pub(crate) fn voter_from_caller<'a>(
+    caller_module_id: &'a str,
+    claimed: Option<&str>,
+) -> Result<&'a str, crate::error::GovernanceError> {
+    if caller_module_id.is_empty() {
+        return Err(crate::error::GovernanceError::Proposal(
+            "a vote requires the calling module".to_string(),
+        ));
+    }
+    if let Some(name) = claimed
+        && name != caller_module_id
+    {
+        return Err(crate::error::GovernanceError::Proposal(
+            "vote is recorded for the calling module".to_string(),
+        ));
+    }
+    Ok(caller_module_id)
 }
 
 fn apply_created(
@@ -196,6 +202,11 @@ fn apply_voted(
             "unknown proposal {proposal_id}"
         )));
     };
+    if p.votes.iter().any(|existing| existing.voter == voter) {
+        return Err(crate::error::GovernanceError::Proposal(format!(
+            "proposal {proposal_id} already has a vote from {voter}"
+        )));
+    }
     p.votes.push(ProposalVote { voter, vote });
     Ok(())
 }
@@ -279,5 +290,98 @@ mod tests {
         assert!(err.to_string().contains("unknown proposal"));
         assert!(!proposals.contains_key("missing"));
         assert!(proposals.get("p1").unwrap().votes.is_empty());
+    }
+
+    #[test]
+    fn a_second_vote_from_the_same_voter_keeps_the_first() {
+        let mut proposals = HashMap::new();
+        proposals.insert("p1".to_string(), created("p1"));
+        apply_voted(
+            &mut proposals,
+            "p1",
+            "blvm-mesh".to_string(),
+            "approve".to_string(),
+        )
+        .unwrap();
+        let err = apply_voted(
+            &mut proposals,
+            "p1",
+            "blvm-mesh".to_string(),
+            "reject".to_string(),
+        )
+        .unwrap_err();
+        let votes = &proposals.get("p1").unwrap().votes;
+        assert_eq!(votes.len(), 1);
+        assert_eq!(votes[0].vote, "approve");
+        assert!(err.to_string().contains("already has a vote"));
+    }
+
+    #[test]
+    fn the_voter_is_the_calling_module() {
+        assert_eq!(voter_from_caller("blvm-mesh", None).unwrap(), "blvm-mesh");
+        assert_eq!(
+            voter_from_caller("blvm-mesh", Some("blvm-mesh")).unwrap(),
+            "blvm-mesh"
+        );
+        assert!(voter_from_caller("blvm-mesh", Some("alice")).is_err());
+        assert!(voter_from_caller("", Some("alice")).is_err());
+    }
+
+    #[test]
+    fn a_module_event_does_not_change_the_store() {
+        let dir = std::env::temp_dir().join(format!(
+            "blvm-governance-proposals-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = blvm_sdk::module::ModuleDb::open(&dir).unwrap();
+        let store = ProposalStore::new(db.as_db());
+        let created = module_event(
+            "blvm-governance",
+            "GovernanceProposalCreated",
+            br#"{"proposal_id":"p1","repository":"org/repo","pr_number":1,"tier":"t"}"#,
+        );
+        store.handle_event(&created).unwrap();
+        assert!(store.load_proposals().unwrap().is_empty());
+
+        store
+            .create_proposal("p1".to_string(), "org/repo".to_string(), 1, "t".to_string())
+            .unwrap();
+        let voted = module_event(
+            "blvm-other",
+            "GovernanceProposalVoted",
+            br#"{"proposal_id":"p1","voter":"alice","vote":"approve"}"#,
+        );
+        store.handle_event(&voted).unwrap();
+        let merged = module_event(
+            "blvm-governance",
+            "GovernanceProposalMerged",
+            br#"{"proposal_id":"p1","repository":"evil/repo","pr_number":9}"#,
+        );
+        store.handle_event(&merged).unwrap();
+
+        let stored = store.load_proposals().unwrap();
+        assert_eq!(stored.len(), 1);
+        assert!(stored[0].votes.is_empty());
+        assert!(matches!(stored[0].status, ProposalStatus::Created));
+        assert_eq!(stored[0].repository, "org/repo");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn module_event(source: &str, name: &str, data: &[u8]) -> ModuleMessage {
+        use blvm_node::module::ipc::protocol::{EventMessage, EventPayload};
+        use blvm_node::module::traits::EventType;
+        ModuleMessage::Event(EventMessage {
+            event_type: EventType::ModuleEvent,
+            payload: EventPayload::ModuleEvent {
+                source_module: source.to_string(),
+                name: name.to_string(),
+                data: data.to_vec(),
+            },
+        })
     }
 }

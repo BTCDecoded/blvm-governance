@@ -34,7 +34,7 @@ impl ModuleAPI for GovernanceModuleApi {
         &self,
         method: &str,
         params: &[u8],
-        _caller_module_id: &str,
+        caller_module_id: &str,
     ) -> Result<Vec<u8>, ModuleError> {
         match method {
             "get_proposals" => {
@@ -78,6 +78,14 @@ impl ModuleAPI for GovernanceModuleApi {
                     .and_then(|v| v.as_str())
                     .unwrap_or("standard")
                     .to_string();
+                self.proposal_store
+                    .create_proposal(
+                        proposal_id.clone(),
+                        repository.clone(),
+                        pr_number,
+                        tier.clone(),
+                    )
+                    .map_err(|e| ModuleError::OperationError(e.to_string()))?;
                 let payload = EventPayload::module_event_json(
                     "GovernanceProposalCreated",
                     &serde_json::json!({
@@ -114,16 +122,20 @@ impl ModuleAPI for GovernanceModuleApi {
                         )
                     })?
                     .to_string();
-                let voter = params_json
-                    .get("voter")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
+                let voter = crate::proposals::voter_from_caller(
+                    caller_module_id,
+                    params_json.get("voter").and_then(|v| v.as_str()),
+                )
+                .map_err(|e| ModuleError::OperationError(e.to_string()))?
+                .to_string();
                 let vote = params_json
                     .get("vote")
                     .and_then(|v| v.as_str())
                     .unwrap_or("abstain")
                     .to_string();
+                self.proposal_store
+                    .record_vote(&proposal_id, &voter, &vote)
+                    .map_err(|e| ModuleError::OperationError(e.to_string()))?;
                 let payload = EventPayload::module_event_json(
                     "GovernanceProposalVoted",
                     &serde_json::json!({
@@ -167,6 +179,9 @@ impl ModuleAPI for GovernanceModuleApi {
                     .get("pr_number")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0);
+                self.proposal_store
+                    .record_merged(&proposal_id, repository.clone(), pr_number)
+                    .map_err(|e| ModuleError::OperationError(e.to_string()))?;
                 let payload = EventPayload::module_event_json(
                     "GovernanceProposalMerged",
                     &serde_json::json!({

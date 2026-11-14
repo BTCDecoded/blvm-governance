@@ -16,6 +16,13 @@ pub struct GovernanceWebhookClient {
     enabled: bool,
     /// Absent posts once. `Some(n)` posts up to `n` times, stopping after a success.
     webhook_retry_count: Option<u32>,
+    /// Session id the node stamps on events this module publishes.
+    module_id: String,
+}
+
+/// Post a governance record only when this module published it.
+pub(crate) fn forward_governance_event(source_module: &str, module_id: &str) -> bool {
+    !module_id.is_empty() && source_module == module_id
 }
 
 /// How many times `notify_governance_event` posts. An omitted count posts once.
@@ -74,6 +81,7 @@ impl GovernanceWebhookClient {
             node_id,
             enabled,
             webhook_retry_count,
+            module_id: ctx.module_id.clone(),
         })
     }
 
@@ -99,7 +107,12 @@ impl GovernanceWebhookClient {
                         }
                     }
                     EventType::ModuleEvent => {
-                        if let EventPayload::ModuleEvent { name, data, .. } = &event_msg.payload {
+                        if let EventPayload::ModuleEvent {
+                            source_module,
+                            name,
+                            data,
+                        } = &event_msg.payload
+                        {
                             let value: serde_json::Value =
                                 serde_json::from_slice(data).unwrap_or(serde_json::Value::Null);
                             let kind = match name.as_str() {
@@ -108,7 +121,9 @@ impl GovernanceWebhookClient {
                                 "GovernanceProposalMerged" => "proposal_merged",
                                 _ => "",
                             };
-                            if !kind.is_empty() {
+                            if !kind.is_empty()
+                                && forward_governance_event(source_module, &self.module_id)
+                            {
                                 info!("Governance module event: {name}");
                                 self.notify_governance_event(kind, value, node_api).await?;
                             }
@@ -335,5 +350,17 @@ mod webhook_attempt_tests {
     fn omitted_retry_count_posts_once() {
         assert_eq!(webhook_post_attempts(None), 1);
         assert_eq!(webhook_post_attempts(Some(3)), 3);
+    }
+
+    #[test]
+    fn only_this_modules_event_is_forwarded() {
+        use super::forward_governance_event;
+        assert!(forward_governance_event(
+            "blvm-governance",
+            "blvm-governance"
+        ));
+        assert!(!forward_governance_event("blvm-mesh", "blvm-governance"));
+        assert!(!forward_governance_event("", "blvm-governance"));
+        assert!(!forward_governance_event("blvm-governance", ""));
     }
 }

@@ -39,7 +39,7 @@ impl GovernanceModule {
         Ok(())
     }
 
-    /// List governance proposals (stored when node publishes GovernanceProposal* events).
+    /// List governance proposals recorded by this module's API.
     #[command]
     fn list_proposals(&self, _ctx: &InvocationContext) -> Result<String, ModuleError> {
         let proposals = self
@@ -48,7 +48,7 @@ impl GovernanceModule {
             .map_err(|e| ModuleError::Other(e.to_string()))?;
         if proposals.is_empty() {
             return Ok("No proposals yet.\n\
-                Proposals appear when the node publishes GovernanceProposalCreated events."
+                Proposals are recorded by the governance module API."
                 .into());
         }
         let mut out = format!("Proposals ({}):\n", proposals.len());
