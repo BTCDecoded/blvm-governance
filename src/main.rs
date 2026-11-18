@@ -46,6 +46,22 @@ async fn main() -> Result<()> {
                 warn!("Failed to register governance module API: {}", e);
             }
             tracing::info!("Governance module initialized and running");
+            if let (Some(listen), Some(commons)) = (
+                config
+                    .listen
+                    .clone()
+                    .filter(|value| !value.trim().is_empty()),
+                config
+                    .commons_url
+                    .clone()
+                    .filter(|value| !value.trim().is_empty()),
+            ) {
+                tokio::spawn(async move {
+                    if let Err(error) = blvm_governance::proxy::serve(listen, commons).await {
+                        warn!("governance proxy stopped: {error}");
+                    }
+                });
+            }
             let module = GovernanceModule {
                 proposal_store,
                 webhook_client: Arc::new(webhook_client),

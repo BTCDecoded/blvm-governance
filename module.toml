@@ -1,6 +1,6 @@
 name = "blvm-governance"
 version = "0.1.4"
-description = "Governance webhook and economic node tracking module for blvm-node"
+description = "Optional governance webhook. Posts to a URL, or forwards block posts to blvm-commons."
 author = "Bitcoin Commons Team"
 entry_point = "blvm-governance"
 
@@ -10,6 +10,8 @@ capabilities = [
 ]
 
 [config_schema]
-webhook_url = "Optional governance webhook URL for proposal notifications"
+webhook_url = "Where this node posts. Leave empty to stay quiet."
+listen = "Proxy bind address. Unset means this process does not listen."
+commons_url = "blvm-commons base URL. Block posts go to /webhooks/block."
 
 # Written by release CI — do not edit by hand.

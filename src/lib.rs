@@ -5,6 +5,7 @@ pub mod config;
 pub mod error;
 pub mod module;
 pub mod proposals;
+pub mod proxy;
 pub mod storage;
 pub mod webhook;
 

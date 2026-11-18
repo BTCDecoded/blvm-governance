@@ -12,6 +12,7 @@ use tracing::{debug, info, warn};
 pub struct GovernanceWebhookClient {
     client: Client,
     webhook_url: Option<String>,
+    commons_url: Option<String>,
     node_id: Option<String>,
     enabled: bool,
     /// Absent posts once. `Some(n)` posts up to `n` times, stopping after a success.
@@ -54,11 +55,13 @@ impl GovernanceWebhookClient {
         ctx: &blvm_node::module::traits::ModuleContext,
     ) -> Result<Self, GovernanceError> {
         let webhook_url = ctx.get_config("governance.webhook_url").cloned();
+        let commons_url = ctx.get_config("governance.commons_url").cloned();
         let node_id = ctx.get_config("governance.node_id").cloned();
         let webhook_retry_count = ctx
             .get_config("governance.webhook_retry_count")
             .and_then(|value| value.parse().ok());
-        let enabled = webhook_url.is_some();
+        let enabled =
+            crate::proxy::block_post_url(webhook_url.as_deref(), commons_url.as_deref()).is_some();
 
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(10))
@@ -68,7 +71,9 @@ impl GovernanceWebhookClient {
             })?;
 
         if enabled {
-            if let Some(ref url) = webhook_url {
+            if let Some(url) =
+                crate::proxy::block_post_url(webhook_url.as_deref(), commons_url.as_deref())
+            {
                 info!("Governance webhook client initialized: {}", url);
             }
         } else {
@@ -78,6 +83,7 @@ impl GovernanceWebhookClient {
         Ok(Self {
             client,
             webhook_url,
+            commons_url,
             node_id,
             enabled,
             webhook_retry_count,
@@ -233,7 +239,9 @@ impl GovernanceWebhookClient {
             return Ok(());
         }
 
-        let Some(url) = self.webhook_url.as_ref() else {
+        let Some(url) =
+            crate::proxy::block_post_url(self.webhook_url.as_deref(), self.commons_url.as_deref())
+        else {
             return Ok(());
         };
 
@@ -256,7 +264,7 @@ impl GovernanceWebhookClient {
         let event_type = "block";
 
         // Send webhook and publish WebhookSent/WebhookFailed
-        match self.client.post(url).json(&payload).send().await {
+        match self.client.post(&url).json(&payload).send().await {
             Ok(response) => {
                 if response.status().is_success() {
                     debug!(

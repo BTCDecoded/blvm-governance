@@ -38,6 +38,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # HTTP client for webhooks (blocking for sync CLI)
 reqwest = { version = "0.12", features = ["json", "blocking"] }
+axum = "0.7"
 
 # Hex encoding/decoding
 hex = "0.4"
