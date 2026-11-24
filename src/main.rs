@@ -26,7 +26,11 @@ async fn main() -> Result<()> {
         let bootstrap = bootstrap.clone();
         let data_dir = data_dir.to_path_buf();
         async move {
-            let (ctx, config) = bootstrap.context_with_config::<GovernanceConfig>(&data_dir);
+            let (ctx, config) = bootstrap
+                .context_with_config::<GovernanceConfig>(&data_dir)
+                .map_err(|error| {
+                    blvm_node::module::traits::ModuleError::Other(error.to_string())
+                })?;
             let webhook_url = config.webhook_url.clone();
             let webhook_client =
                 webhook::GovernanceWebhookClient::new(&ctx)

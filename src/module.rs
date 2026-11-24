@@ -76,7 +76,8 @@ impl GovernanceModule {
         let data_dir =
             std::env::var("DATA_DIR").unwrap_or_else(|_| "data/modules/blvm-governance".into());
         let config_path = std::path::Path::new(&data_dir).join("config.toml");
-        let config = crate::GovernanceConfig::load(&config_path).unwrap_or_default();
+        let config = crate::GovernanceConfig::load(&config_path)
+            .map_err(|error| ModuleError::Other(error.to_string()))?;
         let Some(url) = &config.webhook_url else {
             return Ok(
                 "Webhook not configured (governance.webhook_url). Set in config.toml.".into(),
@@ -107,7 +108,8 @@ impl GovernanceModule {
         let data_dir =
             std::env::var("DATA_DIR").unwrap_or_else(|_| "data/modules/blvm-governance".into());
         let config_path = std::path::Path::new(&data_dir).join("config.toml");
-        let config = crate::GovernanceConfig::load(&config_path).unwrap_or_default();
+        let config = crate::GovernanceConfig::load(&config_path)
+            .map_err(|error| ModuleError::Other(error.to_string()))?;
         Ok(format!(
             "blvm-governance module\n\
              Config: {}\n\
